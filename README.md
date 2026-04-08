@@ -94,6 +94,21 @@ cd frontend && npm install && npm run dev
 
 ---
 
+## ✅ Submission Validation
+Before submitting, run our automated validator to ensure your Hugging Face Space is live and the Docker image builds correctly:
+
+```bash
+chmod +x scripts/validate-submission.sh
+./scripts/validate-submission.sh https://huggingface.co/spaces/vivekvish2004/openenv-customer-support
+```
+
+This script will verify:
+1.  **Connectivity**: Ensures your Space's `/reset` endpoint is reachable.
+2.  **Containerability**: Validates that your `Dockerfile` builds successfully.
+3.  **OpenEnv Compliance**: Runs `openenv validate` to check logic consistency.
+
+---
+
 ## 📤 Deployment
 This repository is optimized for **Hugging Face Spaces**. The multi-stage `Dockerfile` handles the Node.js build automatically.
 
