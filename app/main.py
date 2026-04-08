@@ -24,10 +24,6 @@ async def favicon():
 # Global singleton for the environment state lifecycle
 env_instance = CustomerSupportEnv()
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to OpenEnv Customer Support API"}
-
 @app.api_route("/reset", methods=["GET", "POST"], response_model=Observation)
 def reset_env():
     """Reset the environment and yield the initial observation."""
