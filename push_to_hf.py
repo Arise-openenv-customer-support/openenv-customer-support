@@ -16,11 +16,7 @@ def main():
         login()
         
     repo_target = "vivekvish2004/openenv-customer-support"
-    print(f"\nEnsuring Hugging Face Space exists -> {repo_target}")
-    from huggingface_hub import create_repo
-    create_repo(repo_id=repo_target, repo_type="space", space_sdk="docker", exist_ok=True)
-    
-    print(f"Pushing current workspace files to Space -> {repo_target}")
+    print(f"\nPushing current workspace files to Space -> {repo_target}")
     
     # Push the Space files
     upload_folder(
