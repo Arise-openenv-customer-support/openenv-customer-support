@@ -22,10 +22,10 @@ SCENARIOS = [
     },
     {
         "ticket_text": "I can't log into my account, and I have a huge presentation in 10 minutes that needs the data!",
-        "sentiment": "angry",
+        "sentiment": "panicked",
         "expected_classification": "login_issue",
         "expected_priority": "high",
-        "sla_steps": 4,
+        "sla_steps": 3,
     },
     {
         "ticket_text": "The latest update keeps crashing on my Android phone. Please fix it ASAP.",
@@ -36,10 +36,24 @@ SCENARIOS = [
     },
     {
         "ticket_text": "Do you offer any discounts for students or non-profits?",
-        "sentiment": "neutral",
+        "sentiment": "curious",
         "expected_classification": "general_inquiry",
         "expected_priority": "low",
         "sla_steps": 10,
+    },
+    {
+        "ticket_text": "I just wanted to say that your support team is amazing! Thank you for the quick help.",
+        "sentiment": "happy",
+        "expected_classification": "feedback",
+        "expected_priority": "low",
+        "sla_steps": 12,
+    },
+    {
+        "ticket_text": "I'm worried about my data privacy after the recent news. Can you explain your encryption?",
+        "sentiment": "concerned",
+        "expected_classification": "security",
+        "expected_priority": "medium",
+        "sla_steps": 7,
     }
 ]
 
