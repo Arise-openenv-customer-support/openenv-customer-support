@@ -64,10 +64,10 @@ class CustomerSupportEnv:
         self.actions_taken = set()
         self.history = []
         
-        return self._get_current_observation()
+        return self.state()
 
-    def _get_current_observation(self) -> Observation:
-        """Helper to construct the observation from the current queue head."""
+    def state(self) -> Observation:
+        """Standard OpenEnv API: Retrieve the current observation state."""
         if not self.queue:
             return Observation(
                 state={"status": "session_complete", "message": "All tickets in queue processed."},
@@ -75,7 +75,7 @@ class CustomerSupportEnv:
             )
         
         ticket = self.queue[0]
-        state = {
+        obs_state = {
             "ticket_text": ticket["ticket_text"],
             "sentiment": ticket["sentiment"],
             "priority": ticket.get("priority"),
@@ -88,12 +88,25 @@ class CustomerSupportEnv:
             "sla_warning": self.current_step >= ticket["sla_steps"] - 2
         }
         
-        return Observation(state=state, info={"queue": [t["ticket_text"][:30] + "..." for t in self.queue]})
+        return Observation(state=obs_state, info={"queue": [t["ticket_text"][:30] + "..." for t in self.queue]})
+
+    @property
+    def current_state(self):
+        """Helper for the grader to access the current ticket state dictionary."""
+        obs = self.state()
+        return obs.state
+
+    @property
+    def ground_truth(self):
+        """Helper for the grader to access the expected values of the current ticket."""
+        if not self.queue:
+            return None
+        return self.queue[0]
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, dict]:
-        """Apply an action to the current ticket in the queue."""
+        """Standard OpenEnv API: Apply an action to the environment."""
         if not self.queue:
-            return self._get_current_observation(), Reward(value=0, is_terminal=True), True, {"error": "Queue empty"}
+            return self.state(), Reward(value=0, is_terminal=True), True, {"error": "Queue empty"}
 
         self.current_step += 1
         reward_val = 0.0
@@ -165,4 +178,4 @@ class CustomerSupportEnv:
 
         self.total_reward += reward_val
         
-        return self._get_current_observation(), Reward(value=reward_val, is_terminal=is_terminal), is_terminal, {"message": message}
+        return self.state(), Reward(value=reward_val, is_terminal=is_terminal), is_terminal, {"message": message}
