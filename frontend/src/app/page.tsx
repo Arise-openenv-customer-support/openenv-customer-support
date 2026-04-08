@@ -48,12 +48,18 @@ export default function Home() {
         body: JSON.stringify(actionObj)
       });
       const data = await res.json();
-      setState(data.observation.state);
-      setLogs(prev => [...prev, {
-        role: 'agent', 
-        message: `Executed: ${actionObj.action_type}`,
-        info: `Reward: ${data.reward.value} | Done: ${data.done}`
-      }]);
+      
+      if (data.observation.state.status === "session_complete") {
+        setLogs(prev => [...prev, { role: 'system', message: '🎉 Session Complete! All tickets processed.' }]);
+        setState(data.observation.state);
+      } else {
+        setState(data.observation.state);
+        setLogs(prev => [...prev, {
+          role: 'agent', 
+          message: `Executed: ${actionObj.action_type}`,
+          info: `${data.info.message} | Reward: ${data.reward.value.toFixed(2)}`
+        }]);
+      }
     } catch (e) {
       alert("Invalid JSON action format or Network Error.");
     }
@@ -76,119 +82,154 @@ export default function Home() {
 
   return (
     <main className="container animate-slide">
-      <header style={{ marginBottom: '3rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--foreground)' }}>
-          OpenEnv <span style={{ color: 'var(--primary)' }}>Control Center</span>
-        </h1>
-        <p style={{ color: 'var(--muted)', fontSize: '1.1rem' }}>Enterprise AI Customer Support Simulation & Monitoring</p>
+      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--card-border)', paddingBottom: '1.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--foreground)', margin: 0 }}>
+            OpenEnv <span style={{ color: 'var(--primary)' }}>Enterprise</span>
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: '1.1rem', margin: '0.25rem 0 0 0' }}>AI Customer Support Monitoring & Queue Management</p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+           <button className="btn btn-outline" onClick={resetEnv} disabled={loading}>
+            {loading ? 'Initializing...' : 'New Session'}
+          </button>
+        </div>
       </header>
 
-      <div className="layout-grid">
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+      <div className="layout-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 350px', gap: '2rem' }}>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           <div className="glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Environment Instance</h2>
-              <button className="btn btn-outline" onClick={resetEnv} disabled={loading}>
-                {loading ? 'Initializing...' : 'Refresh Session'}
-              </button>
-            </div>
-
-            {state ? (
+            {state && state.status !== "session_complete" ? (
               <div style={{ display: 'grid', gap: '1.5rem' }}>
-                <div style={{ padding: '1.5rem', background: '#f1f5f9', borderRadius: '16px', border: '1px solid var(--card-border)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticket Content</span>
-                  <p style={{ marginTop: '0.75rem', fontSize: '1.25rem', fontWeight: 600, lineHeight: 1.5 }}>{state.ticket_text}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                   <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Ticket</span>
+                    <p style={{ marginTop: '0.5rem', fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.4 }}>"{state.ticket_text}"</p>
+                  </div>
+                  <div style={{ marginLeft: '2rem', textAlign: 'right' }}>
+                     <div style={{ fontSize: '0.7rem', fontWeight: 800, color: state.sla_warning ? 'var(--error)' : 'var(--muted)', textTransform: 'uppercase' }}>SLA Deadline</div>
+                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: state.sla_warning ? 'var(--error)' : 'var(--foreground)' }}>
+                       {state.steps_taken} / {state.sla_limit} <small style={{ fontSize: '0.8rem', fontWeight: 400 }}>steps</small>
+                     </div>
+                  </div>
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                  <div className="glass-card" style={{ padding: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '0.5rem' }}>Sentiment</div>
-                    <div className={`badge badge-${state.sentiment}`}>
-                      {state.sentiment}
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                  <div className="glass-card" style={{ padding: '0.75rem' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Sentiment</div>
+                    <div className={`badge badge-${state.sentiment}`} style={{ fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>{state.sentiment}</div>
                   </div>
-                  <div className="glass-card" style={{ padding: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '0.5rem' }}>Priority</div>
-                    <div className={`badge ${state.priority ? `badge-${state.priority}` : 'badge-unassigned'}`}>
-                      {state.priority || 'Unassigned'}
-                    </div>
+                  <div className="glass-card" style={{ padding: '0.75rem' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Priority</div>
+                    <div className={`badge ${state.priority ? `badge-${state.priority}` : 'badge-unassigned'}`} style={{ fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>{state.priority || 'Wait'}</div>
                   </div>
-                  <div className="glass-card" style={{ padding: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '0.5rem' }}>Status</div>
-                    <div className={`badge badge-${state.status}`}>
-                      {state.status}
-                    </div>
+                  <div className="glass-card" style={{ padding: '0.75rem' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Status</div>
+                    <div className={`badge badge-${state.status}`} style={{ fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>{state.status}</div>
+                  </div>
+                   <div className="glass-card" style={{ padding: '0.75rem' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Ticket ID</div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>#{Math.floor(Math.random() * 9000) + 1000}</div>
                   </div>
                 </div>
 
-                <div className="glass-card" style={{ background: '#f8fafc' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Session Metrics</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                    <div>
-                      <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 600 }}>Classification</div>
-                      <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{state.classification || 'Pending Analysis'}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="glass-card" style={{ background: '#f8fafc', padding: '1rem' }}>
+                    <div style={{ color: 'var(--muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>Classification</div>
+                    <div style={{ fontWeight: 700, marginTop: '0.25rem', color: state.classification ? 'var(--foreground)' : 'var(--muted)' }}>
+                      {state.classification || 'Pending Analysis...'}
                     </div>
-                    <div>
-                      <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 600 }}>Processing Steps</div>
-                      <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{state.steps_taken} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>/ 10</span></div>
+                  </div>
+                  <div className="glass-card" style={{ background: '#f8fafc', padding: '1rem' }}>
+                    <div style={{ color: 'var(--muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>Session Reward</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)', marginTop: '0.1rem' }}>
+                      {(state.total_reward || 0).toFixed(2)}
                     </div>
                   </div>
                 </div>
               </div>
+            ) : state?.status === "session_complete" ? (
+              <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🏆</div>
+                <h2 style={{ fontSize: '2rem', fontWeight: 800 }}>Session Complete</h2>
+                <p style={{ color: 'var(--muted)', marginBottom: '2rem' }}>All tickets have been successfully processed through the pipeline.</p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem' }}>
+                   <div>
+                     <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>RESOLVED</div>
+                     <div style={{ fontSize: '2rem', fontWeight: 900 }}>{state.info.resolved}</div>
+                   </div>
+                   <div>
+                     <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>TOTAL REWARD</div>
+                     <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)' }}>{state.info.total_reward.toFixed(2)}</div>
+                   </div>
+                </div>
+              </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted)' }}>
-                No active environment. Initialize session to begin.
+              <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--muted)' }}>
+                Initialize enterprise session to begin monitoring AI decisions.
               </div>
             )}
           </div>
 
           <div className="glass-card">
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Control Input</h2>
-            <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-              <div style={{ position: 'absolute', top: '12px', right: '12px', fontSize: '0.7rem', fontWeight: 800, color: 'var(--muted)' }}>JSON</div>
-              <textarea 
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+               <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--primary)' }}></span>
+               Control Input
+            </h2>
+            <div style={{ position: 'relative', marginBottom: '1rem' }}>
+               <textarea 
                 value={actionInput}
                 onChange={(e) => setActionInput(e.target.value)}
-                rows={6}
-                style={{ fontSize: '0.9rem', lineHeight: 1.6, background: '#f8fafc' }}
+                rows={4}
+                style={{ fontSize: '0.9rem', fontFamily: 'monospace', background: '#f8fafc', border: '1px solid var(--card-border)' }}
               />
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn" onClick={sendAction} disabled={loading || !state || state.status === 'closed'} style={{ flex: 1 }}>
-                Execute Command
+              <button className="btn" onClick={sendAction} disabled={loading || !state || state.status === 'session_complete'} style={{ flex: 2 }}>
+                Execute Script Action
               </button>
-              <button className="btn btn-outline" onClick={runHardGrader} disabled={loading || !state} style={{ flex: 1, borderColor: 'var(--success)', color: 'var(--success)' }}>
-                Verify Progress
+              <button className="btn btn-outline" onClick={runHardGrader} disabled={loading || !state} style={{ flex: 1 }}>
+                Grade Model
               </button>
             </div>
-
             {score !== null && (
-              <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, color: '#065f46' }}>Evaluation Result</span>
-                <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669' }}>{(score * 100).toFixed(0)}%</span>
+              <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, color: '#065f46', fontSize: '0.8rem' }}>Evaluation Score</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#059669' }}>{(score * 100).toFixed(0)}%</span>
               </div>
             )}
           </div>
 
         </section>
 
-        <section>
-          <div className="glass-card" style={{ height: '100%', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Activity Timeline</h2>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+           <div className="glass-card" style={{ flex: 1, minHeight: '350px' }}>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
+                Queue <span className="badge" style={{ background: 'var(--primary)', color: 'white' }}>{state?.queue_size || 0}</span>
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                 {state?.info?.queue ? state.info.queue.map((q: string, i: number) => (
+                   <div key={i} className="glass-card" style={{ padding: '0.75rem', fontSize: '0.8rem', borderLeft: i === 0 ? '4px solid var(--primary)' : '1px solid var(--card-border)', opacity: i === 0 ? 1 : 0.6 }}>
+                      {q}
+                   </div>
+                 )) : <p style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Waiting for queue initialization...</p>}
+              </div>
+           </div>
+
+           <div className="glass-card" style={{ height: '350px', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>Activity Logs</h2>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse', gap: '0.5rem' }}>
               {logs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
-                  Waiting for activity logs...
-                </div>
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontSize: '0.8rem' }}>No activity logged.</div>
               ) : (
                 logs.map((log, i) => (
-                  <div key={i} className={`log-entry ${log.role === 'agent' ? 'log-agent' : 'log-customer'}`}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)' }}>{log.role}</span>
+                  <div key={i} className={`log-entry ${log.role === 'agent' ? 'log-agent' : 'log-customer'}`} style={{ padding: '0.75rem', borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase' }}>{log.role}</span>
                     </div>
-                    <div style={{ fontWeight: 600 }}>{log.message}</div>
-                    {log.info && <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.5rem', padding: '0.5rem', background: 'white', borderRadius: '6px' }}>{log.info}</div>}
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{log.message}</div>
+                    {log.info && <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '0.25rem' }}>{log.info}</div>}
                   </div>
                 ))
               )}

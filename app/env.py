@@ -1,185 +1,170 @@
 import random
-import copy
-from typing import Tuple
+import time
+from typing import Tuple, List, Dict
 from app.models import Action, Observation, Reward
 
-# Pre-defined real-world support tickets for the workflow simulation
+# Expanded Scenarios with SLA metadata
 SCENARIOS = [
     {
         "ticket_text": "I bought a premium subscription but it's not working. I want my money back right now!",
         "sentiment": "angry",
         "expected_classification": "refund",
         "expected_priority": "high",
+        "sla_steps": 5,
     },
     {
         "ticket_text": "How do I change my profile picture? I tried looking in the settings but couldn't find it.",
         "sentiment": "neutral",
         "expected_classification": "general_inquiry",
         "expected_priority": "low",
+        "sla_steps": 8,
     },
     {
         "ticket_text": "I can't log into my account, and I have a huge presentation in 10 minutes that needs the data!",
         "sentiment": "angry",
         "expected_classification": "login_issue",
         "expected_priority": "high",
+        "sla_steps": 4,
     },
     {
-        "ticket_text": "Thank you so much for fixing the bug! Everything is running perfectly today.",
-        "sentiment": "happy",
-        "expected_classification": "feedback",
+        "ticket_text": "The latest update keeps crashing on my Android phone. Please fix it ASAP.",
+        "sentiment": "angry",
+        "expected_classification": "technical_issue",
+        "expected_priority": "medium",
+        "sla_steps": 6,
+    },
+    {
+        "ticket_text": "Do you offer any discounts for students or non-profits?",
+        "sentiment": "neutral",
+        "expected_classification": "general_inquiry",
         "expected_priority": "low",
+        "sla_steps": 10,
     }
 ]
 
 class CustomerSupportEnv:
     def __init__(self):
-        """Initialize the AI Customer Support environment."""
-        self.current_state = None
-        self.ground_truth = None
-        self.max_steps = 10
+        """Initialize the Enterprise AI Customer Support environment."""
+        self.queue: List[Dict] = []
+        self.resolved_count = 0
+        self.total_reward = 0.0
+        self.max_steps_per_ticket = 10
         self.current_step = 0
         self.actions_taken = set()
+        self.history = []
 
     def reset(self) -> Observation:
-        """Reset the environment to a new random customer support ticket."""
-        self.ground_truth = random.choice(SCENARIOS)
+        """Initialize a new enterprise session with a queue of tickets."""
+        # Pick 3 random unique scenarios for the queue
+        self.queue = [copy.deepcopy(s) for s in random.sample(SCENARIOS, 3)]
+        self.resolved_count = 0
+        self.total_reward = 0.0
         self.current_step = 0
         self.actions_taken = set()
+        self.history = []
         
-        # State strictly matching requirements
-        self.current_state = {
-            "ticket_text": self.ground_truth["ticket_text"],
-            "sentiment": self.ground_truth["sentiment"],
-            "priority": None,        # AI will assign (low / medium / high)
-            "status": "open",        # Track ticket lifecycle
-            "steps_taken": 0,
-            "classification": None,  # AI will classify
-            "response": None         # AI's generated reply
+        return self._get_current_observation()
+
+    def _get_current_observation(self) -> Observation:
+        """Helper to construct the observation from the current queue head."""
+        if not self.queue:
+            return Observation(
+                state={"status": "session_complete", "message": "All tickets in queue processed."},
+                info={"resolved": self.resolved_count, "total_reward": self.total_reward}
+            )
+        
+        ticket = self.queue[0]
+        state = {
+            "ticket_text": ticket["ticket_text"],
+            "sentiment": ticket["sentiment"],
+            "priority": ticket.get("priority"),
+            "status": ticket.get("status", "open"),
+            "steps_taken": self.current_step,
+            "classification": ticket.get("classification"),
+            "response": ticket.get("response"),
+            "queue_size": len(self.queue),
+            "sla_limit": ticket["sla_steps"],
+            "sla_warning": self.current_step >= ticket["sla_steps"] - 2
         }
         
-        return self.state()
-        
-    def state(self) -> Observation:
-        """Return the current state of the environment."""
-        return Observation(
-            state=self.current_state,
-            info={"max_steps": self.max_steps}
-        )
+        return Observation(state=state, info={"queue": [t["ticket_text"][:30] + "..." for t in self.queue]})
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, dict]:
-        """Apply an action to process the ticket workflow and evaluate using dense rewards."""
+        """Apply an action to the current ticket in the queue."""
+        if not self.queue:
+            return self._get_current_observation(), Reward(value=0, is_terminal=True), True, {"error": "Queue empty"}
+
         self.current_step += 1
-        self.current_state["steps_taken"] += 1
-        
         reward_val = 0.0
         is_terminal = False
         message = ""
         
+        current_ticket = self.queue[0]
         a_type = action.action_type
         payload = action.payload
-        
-        # Ensure ticket is open to take steps
-        if self.current_state["status"] == "closed":
-            return self.state(), Reward(value=-0.2, is_terminal=True), True, {"error": "Ticket is already closed"}
 
-        # Penalize repeated actions (-0.1)
-        if a_type in self.actions_taken:
-            reward_val -= 0.1
-            message += "Repeated action penalty. "
-        else:
-            self.actions_taken.add(a_type)
-            
-        # Penalize taking too many steps (-0.1 step cost)
-        reward_val -= 0.1
-
-        # Simulate the structured workflows with standard explicit dense reward triggers
+        # Action Logic
         if a_type == "classify_ticket":
-            category = payload.get("classification")
-            self.current_state["classification"] = category
-            if category == self.ground_truth["expected_classification"]:
-                reward_val += 0.3 # Correct classification
-                message += "Correct classification."
-            else:
-                reward_val -= 0.2 # Wrong action penalty
-                message += "Incorrect classification."
-                
+            cat = payload.get("classification")
+            current_ticket["classification"] = cat
+            reward_val += 0.3 if cat == current_ticket["expected_classification"] else -0.2
+            message = "Classified. "
+            
         elif a_type == "assign_priority":
-            level = payload.get("priority")
-            self.current_state["priority"] = level
-            if level == self.ground_truth["expected_priority"]:
-                reward_val += 0.2 # Correct priority
-                message += "Correct priority assignment."
-            else:
-                reward_val -= 0.2 # Wrong action penalty
-                message += "Suboptimal priority assignment."
-                
+            pri = payload.get("priority")
+            current_ticket["priority"] = pri
+            reward_val += 0.2 if pri == current_ticket["expected_priority"] else -0.2
+            message = "Priority set. "
+            
         elif a_type == "generate_response":
-            response_text = payload.get("response", "")
-            self.current_state["response"] = response_text
-            
-            # Simplified empathy check for better accessibility in evaluation
-            empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
-            has_empathy = any(word in response_text.lower() for word in empathy_keywords)
-            
-            if self.current_state["sentiment"] == "angry" and not has_empathy:
-                reward_val -= 0.2
-                message += "Response lacked empathy (please use words like 'sorry' or 'understand')."
-            elif response_text.strip() == "":
-                reward_val -= 0.2
-                message += "Empty response generated."
-            else:
-                reward_val += 0.2
-                message += "Valid response generated."
-                
-        elif a_type == "escalate":
-            if self.current_state["sentiment"] == "angry" and self.ground_truth["expected_priority"] == "high":
-                reward_val += 0.3
-                message += "Successfully escalated urgent issue."
-            else:
-                reward_val -= 0.2
-                message += "Unnecessary escalation."
-            self.current_state["status"] = "closed"
-            is_terminal = True
+            resp = payload.get("response", "")
+            current_ticket["response"] = resp
+            has_empathy = any(w in resp.lower() for w in ["sorry", "apologize", "understand", "help"])
+            if current_ticket["sentiment"] == "angry" and not has_empathy:
+                reward_val -= 0.1
+            reward_val += 0.2 if resp.strip() else -0.2
+            message = "Response drafted. "
             
         elif a_type == "resolve":
-            # Fix: Ensure logic handles partial completion correctly in hard grading
-            is_valid_resolve = True
-            if not self.current_state["classification"]:
-                message += "Missing classification. "
-                is_valid_resolve = False
-            if not self.current_state["priority"]:
-                message += "Missing priority assignment. "
-                is_valid_resolve = False
-            if not self.current_state["response"]:
-                message += "Missing customer response. "
-                is_valid_resolve = False
-                
-            if not is_valid_resolve:
-                reward_val -= 0.2
+            # Check completion
+            if current_ticket.get("classification") and current_ticket.get("priority") and current_ticket.get("response"):
+                reward_val += 0.4
+                message = "Ticket Resolved!"
+                current_ticket["status"] = "closed"
+                self.resolved_count += 1
+                # SLA Check
+                if self.current_step > current_ticket["sla_steps"]:
+                    reward_val -= 0.3
+                    message += " (SLA Breached)"
             else:
-                reward_val += 0.3
-                message += "Ticket resolved successfully."
+                reward_val -= 0.2
+                message = "Resolution attempted without full data."
             
-            self.current_state["status"] = "closed"
-            is_terminal = True
+            # Move to next ticket
+            self.queue.pop(0)
+            self.current_step = 0
+            self.actions_taken = set()
+            if not self.queue:
+                is_terminal = True
             
-        else:
-            reward_val -= 0.2 # Wrong action explicitly
-            message += f"Wrong action: Unknown action '{a_type}'."
-            
-        # Failsafe limit checking
-        if self.current_step >= self.max_steps and not is_terminal:
-             is_terminal = True
-             if self.current_state["status"] == "open":
-                 self.current_state["status"] = "closed"
-                 
-        obs = self.state()
-        reward = Reward(value=reward_val, is_terminal=is_terminal)
+        elif a_type == "escalate":
+            reward_val += 0.2 if current_ticket["sentiment"] == "angry" else -0.2
+            message = "Escalated to Manager."
+            # Escalation closes current and moves on
+            self.queue.pop(0)
+            self.current_step = 0
+            if not self.queue:
+                is_terminal = True
+
+        # Penalize repeated or excessive steps
+        if a_type in self.actions_taken:
+            reward_val -= 0.1
+        self.actions_taken.add(a_type)
+        reward_val -= 0.05 # Smaller per-step cost
+
+        self.total_reward += reward_val
         
-        info = {
-            "message": message,
-            "expected_classification": self.ground_truth["expected_classification"],
-            "expected_priority": self.ground_truth["expected_priority"]
-        }
-        
-        return obs, reward, is_terminal, info
+        return self._get_current_observation(), Reward(value=reward_val, is_terminal=is_terminal), is_terminal, {"message": message}
+
+# Need to import copy for deepcopy
+import copy
