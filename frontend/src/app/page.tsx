@@ -75,93 +75,98 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="container animate-fade-in">
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ color: 'var(--primary)' }}>OpenEnv Dashboard</h1>
-        <p style={{ opacity: 0.7 }}>AI Customer Support Simulation</p>
+    <main className="container animate-slide">
+      <header style={{ marginBottom: '3rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--foreground)' }}>
+          OpenEnv <span style={{ color: 'var(--primary)' }}>Control Center</span>
+        </h1>
+        <p style={{ color: 'var(--muted)', fontSize: '1.1rem' }}>Enterprise AI Customer Support Simulation & Monitoring</p>
       </header>
 
       <div className="layout-grid">
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
           
           <div className="glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2>Active Environment State</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Environment Instance</h2>
               <button className="btn btn-outline" onClick={resetEnv} disabled={loading}>
-                {loading ? 'Processing...' : 'Reset Environment'}
+                {loading ? 'Initializing...' : 'Refresh Session'}
               </button>
             </div>
 
             {state ? (
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-                  <span style={{ fontSize: '0.8rem', opacity: 0.7, textTransform: 'uppercase' }}>Incoming Ticket Log</span>
-                  <p style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 500 }}>"{state.ticket_text}"</p>
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div style={{ padding: '1.5rem', background: '#f1f5f9', borderRadius: '16px', border: '1px solid var(--card-border)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticket Content</span>
+                  <p style={{ marginTop: '0.75rem', fontSize: '1.25rem', fontWeight: 600, lineHeight: 1.5 }}>{state.ticket_text}</p>
                 </div>
                 
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div className="glass-card" style={{ flex: 1, padding: '12px' }}>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Sentiment</div>
-                    <div className={`badge badge-${state.sentiment}`} style={{ display: 'inline-block', marginTop: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                  <div className="glass-card" style={{ padding: '1rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '0.5rem' }}>Sentiment</div>
+                    <div className={`badge badge-${state.sentiment}`}>
                       {state.sentiment}
                     </div>
                   </div>
-                  <div className="glass-card" style={{ flex: 1, padding: '12px' }}>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Priority</div>
-                    <div style={{ fontWeight: 600, color: 'var(--warning)', marginTop: '4px', textTransform: 'capitalize' }}>
+                  <div className="glass-card" style={{ padding: '1rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '0.5rem' }}>Priority</div>
+                    <div className={`badge ${state.priority ? `badge-${state.priority}` : 'badge-unassigned'}`}>
                       {state.priority || 'Unassigned'}
                     </div>
                   </div>
-                  <div className="glass-card" style={{ flex: 1, padding: '12px' }}>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Status</div>
-                    <div className={`badge badge-${state.status}`} style={{ display: 'inline-block', marginTop: '4px' }}>
+                  <div className="glass-card" style={{ padding: '1rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '0.5rem' }}>Status</div>
+                    <div className={`badge badge-${state.status}`}>
                       {state.status}
                     </div>
                   </div>
                 </div>
 
-                <div className="glass-card">
-                  <h3 style={{ fontSize: '1rem' }}>System Variables</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                <div className="glass-card" style={{ background: '#f8fafc' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Session Metrics</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                     <div>
-                      <div style={{ opacity: 0.7, fontSize: '0.8rem' }}>Classification</div>
-                      <div style={{ fontWeight: 500 }}>{state.classification || 'Unassigned'}</div>
+                      <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 600 }}>Classification</div>
+                      <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{state.classification || 'Pending Analysis'}</div>
                     </div>
                     <div>
-                      <div style={{ opacity: 0.7, fontSize: '0.8rem' }}>Steps Tracked</div>
-                      <div style={{ fontWeight: 500 }}>{state.steps_taken} / 10</div>
+                      <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 600 }}>Processing Steps</div>
+                      <div style={{ fontWeight: 700, marginTop: '0.25rem' }}>{state.steps_taken} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>/ 10</span></div>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.5 }}>
-                No active environment. Click Reset.
+              <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted)' }}>
+                No active environment. Initialize session to begin.
               </div>
             )}
           </div>
 
           <div className="glass-card">
-            <h2>Send Action (JSON Payload)</h2>
-            <textarea 
-              value={actionInput}
-              onChange={(e) => setActionInput(e.target.value)}
-              rows={5}
-              style={{ fontFamily: 'monospace', marginBottom: '1rem' }}
-            />
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Control Input</h2>
+            <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+              <div style={{ position: 'absolute', top: '12px', right: '12px', fontSize: '0.7rem', fontWeight: 800, color: 'var(--muted)' }}>JSON</div>
+              <textarea 
+                value={actionInput}
+                onChange={(e) => setActionInput(e.target.value)}
+                rows={6}
+                style={{ fontSize: '0.9rem', lineHeight: 1.6, background: '#f8fafc' }}
+              />
+            </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn" onClick={sendAction} disabled={loading || !state || state.status === 'closed'}>
-                Execute Action
+              <button className="btn" onClick={sendAction} disabled={loading || !state || state.status === 'closed'} style={{ flex: 1 }}>
+                Execute Command
               </button>
-              <button className="btn btn-success" onClick={runHardGrader} disabled={loading || !state}>
-                Grade Execution
+              <button className="btn btn-outline" onClick={runHardGrader} disabled={loading || !state} style={{ flex: 1, borderColor: 'var(--success)', color: 'var(--success)' }}>
+                Verify Progress
               </button>
             </div>
 
             {score !== null && (
-              <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--success)', borderRadius: '8px' }}>
-                <strong style={{ color: 'var(--success)' }}>HARD TASK GRADING SCORE: </strong> 
-                <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{(score * 100).toFixed(0)}%</span>
+              <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, color: '#065f46' }}>Evaluation Result</span>
+                <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669' }}>{(score * 100).toFixed(0)}%</span>
               </div>
             )}
           </div>
@@ -169,16 +174,21 @@ export default function Home() {
         </section>
 
         <section>
-          <div className="glass-card" style={{ height: '100%' }}>
-            <h2>Execution Log</h2>
-            <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="glass-card" style={{ height: '100%', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Activity Timeline</h2>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
               {logs.length === 0 ? (
-                <div style={{ opacity: 0.5, textAlign: 'center', padding: '1rem' }}>Awaiting Actions...</div>
+                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                  Waiting for activity logs...
+                </div>
               ) : (
                 logs.map((log, i) => (
                   <div key={i} className={`log-entry ${log.role === 'agent' ? 'log-agent' : 'log-customer'}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)' }}>{log.role}</span>
+                    </div>
                     <div style={{ fontWeight: 600 }}>{log.message}</div>
-                    {log.info && <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '4px' }}>{log.info}</div>}
+                    {log.info && <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.5rem', padding: '0.5rem', background: 'white', borderRadius: '6px' }}>{log.info}</div>}
                   </div>
                 ))
               )}

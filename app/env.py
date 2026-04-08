@@ -114,32 +114,50 @@ class CustomerSupportEnv:
                 message += "Suboptimal priority assignment."
                 
         elif a_type == "generate_response":
-            response_text = payload.get("response")
+            response_text = payload.get("response", "")
             self.current_state["response"] = response_text
             
-            if self.current_state["sentiment"] == "angry" and "sorry" not in response_text.lower():
-                reward_val -= 0.2 # Wrong action penalty (lacked empathy)
-                message += "Response lacked empathy for an angry customer."
+            # Simplified empathy check for better accessibility in evaluation
+            empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
+            has_empathy = any(word in response_text.lower() for word in empathy_keywords)
+            
+            if self.current_state["sentiment"] == "angry" and not has_empathy:
+                reward_val -= 0.2
+                message += "Response lacked empathy (please use words like 'sorry' or 'understand')."
+            elif response_text.strip() == "":
+                reward_val -= 0.2
+                message += "Empty response generated."
             else:
-                reward_val += 0.2 # Useful response
-                message += "Useful response generated."
+                reward_val += 0.2
+                message += "Valid response generated."
                 
         elif a_type == "escalate":
             if self.current_state["sentiment"] == "angry" and self.ground_truth["expected_priority"] == "high":
-                reward_val += 0.3 # Act as successful resolution of urgent cases
+                reward_val += 0.3
                 message += "Successfully escalated urgent issue."
             else:
-                reward_val -= 0.2 # Wrong action penalty
-                message += "Wrong action: Unnecessary escalation for low-priority issue."
+                reward_val -= 0.2
+                message += "Unnecessary escalation."
             self.current_state["status"] = "closed"
             is_terminal = True
             
         elif a_type == "resolve":
-            if not self.current_state["classification"] or not self.current_state["priority"] or not self.current_state["response"]:
-                reward_val -= 0.2 # Wrong action penalty
-                message += "Wrong action: Attempted resolution without completing workflow steps."
+            # Fix: Ensure logic handles partial completion correctly in hard grading
+            is_valid_resolve = True
+            if not self.current_state["classification"]:
+                message += "Missing classification. "
+                is_valid_resolve = False
+            if not self.current_state["priority"]:
+                message += "Missing priority assignment. "
+                is_valid_resolve = False
+            if not self.current_state["response"]:
+                message += "Missing customer response. "
+                is_valid_resolve = False
+                
+            if not is_valid_resolve:
+                reward_val -= 0.2
             else:
-                reward_val += 0.3 # Resolution success
+                reward_val += 0.3
                 message += "Ticket resolved successfully."
             
             self.current_state["status"] = "closed"

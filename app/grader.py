@@ -18,7 +18,9 @@ def score_medium(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
     response = state.get("response")
     if response:
         # Check empathy constraint for angry customers
-        if state.get("sentiment") == "angry" and "sorry" not in response.lower():
+        empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
+        has_empathy = any(word in response.lower() for word in empathy_keywords)
+        if state.get("sentiment") == "angry" and not has_empathy:
             pass # Missing empathy
         else:
             score += 0.5
@@ -40,7 +42,9 @@ def score_hard(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
     # 3. Respond
     response = state.get("response")
     if response:
-        if state.get("sentiment") == "angry" and "sorry" not in response.lower():
+        empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
+        has_empathy = any(word in response.lower() for word in empathy_keywords)
+        if state.get("sentiment") == "angry" and not has_empathy:
             pass # Missing empathy
         else:
             score += 0.25

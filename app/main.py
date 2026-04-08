@@ -1,10 +1,23 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
 from app.env import CustomerSupportEnv
 from app.models import Action, Observation
 from app.tasks import get_all_tasks
 from app.grader import score_episode
 
 app = FastAPI(title="OpenEnv Customer Support API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows NextJS on 3000 and any other client
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 # Global singleton for the environment state lifecycle
 env_instance = CustomerSupportEnv()
@@ -22,7 +35,7 @@ def reset_env():
 def step_env(action: Action):
     """Submit an action schema to process the environment workflow."""
     if env_instance.current_state is None:
-        raise HTTPException(status_code=400, detail="Environment is not initialized. Please call /reset first.")
+        env_instance.reset()
         
     obs, reward, done, info = env_instance.step(action)
     return {
@@ -36,7 +49,7 @@ def step_env(action: Action):
 def get_state():
     """Retrieve the current deterministic state of the environment."""
     if env_instance.current_state is None:
-        raise HTTPException(status_code=400, detail="Environment is not initialized. Please call /reset first.")
+        env_instance.reset()
     return env_instance.state()
 
 @app.get("/tasks")
@@ -48,7 +61,7 @@ def get_tasks():
 def run_grader(task_id: str = Query(..., description="The matching task ID to score against (e.g. 'task_easy_1')")):
     """Grade the current state of the ticket interaction strictly using the deterministic grader."""
     if env_instance.current_state is None:
-        raise HTTPException(status_code=400, detail="Environment is not initialized. Please call /reset first.")
+        env_instance.reset()
         
     # Map task ID to its logical difficulty tier
     tasks = get_all_tasks()
