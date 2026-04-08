@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-customer-support"
+version = "0.1.0"
+description = "Enterprise AI Customer Support Simulation"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "openai",
+    "requests"
+]
+
+[tool.setuptools]
+packages = ["app"]
