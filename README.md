@@ -10,77 +10,107 @@ tags:
   - reinforcement-learning
   - customer-support
   - env
+  - fastapi
+  - nextjs
 license: mit
 ---
 
-# AI Customer Support Decision-Making Environment (OpenEnv)
+<div align="center">
+  <h1>🏢 OpenEnv Customer Support Simulation</h1>
+  <p><b>A mathematically constrained decision-making environment for AI agents.</b></p>
+  
+  <a href="https://github.com/Vivek-2004V/openenv-customer-support">
+    <img src="https://img.shields.io/badge/GitHub-Repository-blue?logo=github" alt="GitHub">
+  </a>
+  <a href="https://huggingface.co/spaces/vivekvish2004/openenv-customer-support">
+    <img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow" alt="Hugging Face Spaces">
+  </a>
+</div>
 
-## Environment Description
-This is a mathematically constrained OpenEnv Customer Support simulation. It simulates real-world workflows encompassing complex decision-making processes for an AI customer support agent. The environment maps dynamic ticket properties (sentiment, issues) and evaluates sequential agent logic to determine correct problem resolutions across constrained pipelines.
+<hr />
 
-## Action Space
-The AI agent interacts with the environment sequentially by emitting precise JSON payloads defined dynamically inside string schemas.
+## 🌟 Overview
+This project provides a robust **OpenEnv** environment specifically designed for simulating real-world AI customer support workflows. It maps dynamic ticket properties (sentiment, issues) and evaluates sequential agent logic across constrained pipelines.
 
-**Available Actions:**
-- `classify_ticket`: Evaluates string. Payload mapping: `{"classification": "refund" | "general_inquiry" | "login_issue" | "feedback"}`
-- `assign_priority`: Assigns structural tier. Payload mapping: `{"priority": "low" | "medium" | "high"}`
-- `generate_response`: Drafts contextual replies to tickets. Enforces checking `sentiment` logic constraint requirements (e.g., apologies). Payload mapping: `{"response": "<text>"}`
-- `escalate`: Maps directly to manual priority bypass. Empty payload: `{}`
-- `resolve`: Pipeline completion call mapped to constraints checking complete scenario data. Empty payload: `{}`
+The repository includes:
+- 🚀 **FastAPI Backend**: A high-performance simulation engine.
+- 🎨 **Next.js Frontend**: A modern, interactive dashboard to visualize agent decisions in real-time.
+- 🧠 **AI Environment**: Mathematically grounded tasks for evaluating LLMs on complex decision-making.
 
-## Observation Space
-State mapping delivers deterministic JSON payload snapshots back to the interacting agent across the workflow sequence.
+---
 
-**State Fields Include:**
-- `ticket_text`: Read-only simulated user input sequence string.
-- `sentiment`: Customer evaluation mapped (e.g., `angry`, `neutral`, `happy`).
-- `priority`: Active assignment tracker (`null` until categorized).
-- `status`: Global environment variable matching `open` or `closed` lifecycle mapping.
-- `steps_taken`: Numeric iteration tracker mapping execution costs.
-- `classification`: Evaluated class.
-- `response`: Text payload caching assigned generated scripts.
+## 🏗️ Project Structure
+```text
+.
+├── app/                # FastAPI Backend
+│   ├── env.py          # Core OpenEnv Environment logic
+│   ├── tasks.py        # Task definitions (Easy, Medium, Hard)
+│   ├── grader.py       # Deterministic grading & reward logic
+│   └── main.py         # API Endpoints & Server setup
+├── frontend/           # Next.js Dashboard
+│   ├── src/app/        # React components and logic
+│   └── public/         # Static assets
+├── inference.py        # Evaluation script for LLM testing
+├── Dockerfile          # Containerization for deployment
+└── requirements.txt    # Python dependencies
+```
 
-## Task Descriptions
-The environment exposes explicit evaluation goals mapping standard deterministic task metrics (`0.0` - `1.0`):
+---
 
-- **EASY** (`task_easy_1`): Only classify the issue correctly. 
-- **MEDIUM** (`task_medium_1`): Classify the ticket completely and generate an appropriate text response (measuring conditional logic like providing empathy for an explicitly 'angry' sentiment).
-- **HARD** (`task_hard_1`): The agent structurally navigates the entire pipeline: 1. Correctly classify mapping 2. Assign priority mappings accurately 3. Emit valid appropriate responses 4. Correctly resolve the closed ticket state.
+## 🎮 Action Space
+The agent interacts with the environment by emitting precise JSON payloads:
 
-## Reward Design
-Densely structured continuous math map designed for precision agent behavior shaping:
+- **`classify_ticket`**: Categorize the issue (e.g., `refund`, `login_issue`).
+- **`assign_priority`**: Set structural tier (`low`, `medium`, `high`).
+- **`generate_response`**: Draft contextual replies based on sentiment.
+- **`escalate`**: Trigger manual priority bypass.
+- **`resolve`**: Finalize the ticket lifecycle.
 
-**Sequential Rewards (Partial Progress):**
-- **`+0.3`**: Correct ticket classification.
-- **`+0.2`**: Accurate priority assignment.
-- **`+0.2`**: Successful appropriate response generation.
-- **`+0.3`**: Officially verified constraint-approved ticket structural resolution.
+---
 
-**Penalties:**
-- **`-0.2`**: Punishes specifically wrong actions (assigning the wrong classification, failing empathy mappings, bypassing procedures).  
-- **`-0.1`**: Punishment for immediately duplicating/repeating explicit prior script actions iteratively.
-- **`-0.1`**: Incurred purely per sequential step count scaling execution delays to promote processing speed organically.
+## 📊 Task & Reward System
+| Complexity | Task ID | Objectives |
+| :--- | :--- | :--- |
+| **Easy** | `task_easy_1` | Correct classification only. |
+| **Medium** | `task_medium_1` | Classification + Sentiment-aware response. |
+| **Hard** | `task_hard_1` | Full pipeline navigation (Classify → Priority → Response → Resolve). |
 
-## Setup Instructions
-Use pip explicitly isolating a lightweight requirement instance natively natively configuring local systems:
+### Reward Logic:
+- **Success**: Partial rewards for each correct step (`+0.2` to `+0.3`).
+- **Failure**: Penalties for incorrect actions (`-0.2`) or repetition (`-0.1`).
+- **Efficiency**: Step-based penalty (`-0.1`) to promote speed.
 
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
 ```bash
 pip install -r requirements.txt
 ```
 
-Start the interactive API server natively linking locally:
+### 2. Run the Backend (API)
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 7860
 ```
-### Running Via Docker (Hugging Face Ready)
-This build incorporates standard non-root target configs enabling seamless capability deploys onto HF. 
+
+### 3. Run the Frontend (Dashboard)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 4. Running via Docker
 ```bash
 docker build -t openenv-support .
 docker run -p 7860:7860 openenv-support
 ```
 
-## How to Run Inference (Hugging Face / OpenAI)
-Trigger our automated evaluate pipeline structurally invoking evaluations cleanly recording constraints logic directly via precise print hooks dynamically validating execution.
+---
+
+## 🤖 Evaluation & Inference
+Trigger the automated evaluation pipeline to test your LLM's decision-making capabilities:
 
 ```bash
 export MODEL_NAME="meta-llama/Meta-Llama-3-8B-Instruct"
@@ -88,11 +118,20 @@ export HF_TOKEN="hf_..."
 python inference.py --task task_hard_1
 ```
 
-## Push to Hugging Face Hub
-A helper script allows you to rapidly publish your entire codebase straight out into your Hugging Face space repository. 
+---
 
-Run the automated publisher to upload this space seamlessly into `vivekvish2004/openenv-customer-support`:
+## 📤 Deployment
+The project is configured for seamless deployment to Hugging Face Spaces.
+
+To sync the repository:
 ```bash
-python push_to_hf.py
+git add .
+git commit -m "Update README and application logic"
+git push origin main
+git push hf main --force
 ```
-*(This gracefully detects existing tokens and ignores large bloat directories like node_modules to ensure a fast, clean upload!)*
+
+---
+<div align="center">
+  Built with ❤️ using <a href="https://github.com/OpenEnv-AI/OpenEnv">OpenEnv</a>
+</div>
