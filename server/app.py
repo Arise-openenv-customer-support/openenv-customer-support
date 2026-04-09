@@ -63,7 +63,7 @@ def get_state():
 @app.get("/tasks")
 def get_tasks():
     """Retrieve all available tasks mapped in the environment."""
-    return {"tasks": get_all_tasks()}
+    return get_all_tasks()
 
 @app.get("/grader")
 def run_grader(task_id: str = Query(..., description="The matching task ID to score against (e.g. 'task_easy_1')")):
@@ -83,7 +83,7 @@ def run_grader(task_id: str = Query(..., description="The matching task ID to sc
     mock_history = [{"state": env_instance.current_state}]
     
     score = score_episode(task_diff, mock_history, env_instance.ground_truth)
-    return {"task_id": task_id, "score": score}
+    return {"task_id": task_id, "score": score, "reward": score}
 
 @app.get("/baseline")
 def run_baseline():
