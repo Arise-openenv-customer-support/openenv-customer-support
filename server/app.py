@@ -63,7 +63,7 @@ def get_state():
 @app.get("/tasks")
 def get_tasks():
     """Retrieve all available tasks mapped in the environment."""
-    return get_all_tasks()
+    return env_instance.tasks
 
 @app.get("/grader")
 def run_grader(task_id: str = Query(..., description="The matching task ID to score against (e.g. 'task_easy_1')")):

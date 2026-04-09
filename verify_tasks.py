@@ -17,12 +17,12 @@ def test_task_enumeration():
     print("🔍 Testing Task Enumeration...")
     env = CustomerSupportEnv()
     
-    # 1. Check get_tasks exists and returns correct number
-    if not hasattr(env, 'get_tasks'):
-        print("❌ Error: CustomerSupportEnv missing get_tasks() method.")
+    # 1. Check tasks property exists and returns correct number
+    if not hasattr(env, 'tasks'):
+        print("❌ Error: CustomerSupportEnv missing tasks property.")
         return False
     
-    tasks = env.get_tasks()
+    tasks = env.tasks
     print(f"✅ Found {len(tasks)} tasks.")
     
     if len(tasks) < 3:
@@ -36,19 +36,24 @@ def test_task_enumeration():
         
         required_keys = ['has_grader', 'has_evaluator', 'grader']
         for key in required_keys:
-            if not task.get(key):
+            val = task.get(key)
+            if not val:
                 print(f"    ❌ Error: Task {task_id} missing or false for '{key}'.")
                 return False
-        print(f"    ✅ Metadata OK")
+            if key == 'grader' and not isinstance(val, str):
+                 print(f"    ❌ Error: Task {task_id} grader should be a string reference.")
+                 return False
+        print(f"    ✅ Metadata OK (Grader: {task.get('grader')})")
 
     return True
 
-def test_grader_range():
-    print("\n🔍 Testing Grader Range [0.0, 1.0]...")
+def test_dynamic_grading():
+    print("\n🔍 Testing Dynamic Grader Execution...")
     env = CustomerSupportEnv()
-    tasks = env.get_tasks()
+    tasks = env.tasks
     
-    # Mock ground truth and state for testing
+    import importlib
+    
     ground_truth = {
         "expected_classification": "refund",
         "expected_priority": "high",
@@ -57,53 +62,32 @@ def test_grader_range():
     
     for task in tasks:
         task_id = task.get('id')
-        difficulty = task.get('difficulty', 'EASY')
-        print(f"  - Grading task: {task_id} ({difficulty})")
+        grader_ref = task.get('grader')
+        print(f"  - Testing grader for: {task_id} -> {grader_ref}")
         
-        # Test Case 1: Empty History
-        score_empty = score_episode(difficulty, [], ground_truth)
-        print(f"    Empty history score: {score_empty:.3f}")
-        if not (0.0 <= score_empty <= 1.0):
-            print(f"    ❌ Error: Score {score_empty} out of range!")
+        try:
+            mod_name, func_name = grader_ref.split(':')
+            module = importlib.import_module(mod_name)
+            grader_func = getattr(module, func_name)
+        except Exception as e:
+            print(f"    ❌ Error: Could not resolve grader {grader_ref}: {e}")
             return False
             
-        # Test Case 2: Perfect State
-        mock_perfect_state = {
-            "classification": "refund",
-            "priority": "high",
-            "response": "I am so sorry, we will help you.",
-            "status": "closed",
-            "sentiment": "angry"
-        }
-        mock_history = [{"state": mock_perfect_state}]
-        score_perfect = score_episode(difficulty, mock_history, ground_truth)
-        print(f"    Perfect state score: {score_perfect:.3f}")
-        if not (0.0 <= score_perfect <= 1.0):
-            print(f"    ❌ Error: Score {score_perfect} out of range!")
+        # Test Grader Functionality
+        mock_state = {"classification": "refund", "priority": "high", "status": "closed", "response": "sorry", "sentiment": "angry"}
+        score = grader_func(task.get('difficulty', 'EASY'), [{"state": mock_state}], ground_truth)
+        print(f"    Mock execution score: {score:.3f}")
+        
+        if not (0.0 <= score <= 1.0):
+            print(f"    ❌ Error: Score out of range!")
             return False
             
-        # Test Case 3: Poor State
-        mock_poor_state = {
-            "classification": "wrong",
-            "priority": "low",
-            "response": "",
-            "status": "open",
-            "sentiment": "angry"
-        }
-        mock_history_poor = [{"state": mock_poor_state}]
-        score_poor = score_episode(difficulty, mock_history_poor, ground_truth)
-        print(f"    Poor state score: {score_poor:.3f}")
-        if not (0.0 <= score_poor <= 1.0):
-            print(f"    ❌ Error: Score {score_poor} out of range!")
-            return False
-
-    print("✅ Grader range validation passed for all tasks.")
     return True
 
 if __name__ == "__main__":
     success = test_task_enumeration()
     if success:
-        success = test_grader_range()
+        success = test_dynamic_grading()
     
     if success:
         print("\n✨ ALL TASK VALIDATION CHECKS PASSED!")

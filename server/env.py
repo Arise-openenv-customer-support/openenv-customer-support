@@ -136,9 +136,23 @@ class CustomerSupportEnv:
             return None
         return self.queue[0]
 
-    def get_tasks(self) -> List[Dict]:
-        """Expose available tasks for OpenEnv discovery."""
+    @property
+    def tasks(self) -> List[Dict]:
+        """Expose available tasks for OpenEnv discovery as a property."""
         return TASKS
+
+    def grade_task(self, task_id: str, history: List[Dict[str, Any]], ground_truth: Dict[str, Any]) -> float:
+        """Convenience method for the validator to grade a specific task execution."""
+        from server.grader import score_episode
+        
+        # Determine difficulty from task definition
+        diff = "EASY"
+        for t in TASKS:
+            if t["id"] == task_id:
+                diff = t["difficulty"]
+                break
+                
+        return score_episode(diff, history, ground_truth)
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, dict]:
         """Standard OpenEnv API: Apply an action to the environment."""
