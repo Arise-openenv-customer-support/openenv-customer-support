@@ -75,10 +75,15 @@ def score_episode(task_difficulty: str, history: List[Dict[str, Any]], ground_tr
 
     diff = task_difficulty.upper()
     if diff == "EASY":
-        return score_easy(final_state, ground_truth)
+        score = score_easy(final_state, ground_truth)
     elif diff == "MEDIUM":
-        return score_medium(final_state, ground_truth)
+        score = score_medium(final_state, ground_truth)
     elif diff == "HARD":
-        return score_hard(final_state, ground_truth)
+        score = score_hard(final_state, ground_truth)
+    else:
+        score = 0.0
         
-    return 0.0
+    # OpenEnv requires scores strictly between 0 and 1 (not 0.0 or 1.0)
+    score = 0.01 + (score * 0.98)
+    
+    return score
