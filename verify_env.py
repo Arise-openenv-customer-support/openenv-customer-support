@@ -8,8 +8,9 @@ def test_endpoints():
     print("🚀 Starting local validation test...")
     
     # 1. Start the server
+    cmd = [sys.executable, "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
     process = subprocess.Popen(
-        ["python3", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True

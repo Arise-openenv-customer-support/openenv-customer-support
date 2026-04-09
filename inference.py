@@ -9,7 +9,8 @@ from server.env import CustomerSupportEnv
 from server.models import Action
 
 # Mandatory Environment Configuration
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = HF_TOKEN or os.getenv("API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME = os.getenv("MODEL_NAME") or "meta-llama/Meta-Llama-3-8B-Instruct"
 
@@ -69,7 +70,7 @@ async def main():
             if done:
                 break
 
-            current_state = obs.dict()["state"]
+            current_state = obs.model_dump()["state"]
             
             # Agent decision using OpenAI
             try:

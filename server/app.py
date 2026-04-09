@@ -33,10 +33,15 @@ MODEL_NAME = os.getenv("MODEL_NAME") or "meta-llama/Meta-Llama-3-8B-Instruct"
 env_instance = CustomerSupportEnv()
 ai_client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY) if API_KEY else None
 
-@app.api_route("/reset", methods=["GET", "POST"], response_model=Observation)
+@app.api_route("/reset", methods=["GET", "POST"])
 def reset_env():
     """Reset the environment and yield the initial observation."""
-    return env_instance.reset()
+    obs = env_instance.reset()
+    return {
+        "observation": obs.state,
+        "reward": 0.0,
+        "done": False
+    }
 
 @app.post("/step")
 def step_env(action: Action):
@@ -46,19 +51,19 @@ def step_env(action: Action):
         
     obs, reward, done, info = env_instance.step(action)
     return {
-        "observation": obs.dict(),
-        "reward": reward.dict(),
-        "done": done,
+        "observation": obs.state,
+        "reward": float(reward.value),
+        "done": bool(done),
         "info": info
     }
 
-@app.get("/state", response_model=Observation)
+@app.get("/state")
 def get_state():
     """Retrieve the current deterministic state of the environment."""
     current = env_instance.state().state
     if current.get("status") == "session_complete":
-        return env_instance.reset()
-    return env_instance.state()
+        return {"observation": env_instance.reset().state}
+    return {"observation": env_instance.state().state}
 
 @app.get("/tasks")
 def get_tasks():

@@ -6,3 +6,8 @@ environment:
   type: "custom"
   package: "server.env"
   class: "CustomerSupportEnv"
+
+license: "MIT"
+tags:
+  - customer-support
+  - enterprise-ai
