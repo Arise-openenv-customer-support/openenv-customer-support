@@ -1,6 +1,7 @@
 name: "customer-support-env"
 version: "1.0.0"
 description: "Customer Support Environment for OpenEnv"
+tasks: "tasks.json"
 
 environment:
   type: "custom"
