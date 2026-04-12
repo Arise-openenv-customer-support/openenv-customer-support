@@ -7,22 +7,22 @@ from .models import TicketStatus, Sentiment, Priority, Classification
 def grade_task_easy_1(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
     """task_easy_1 – Ticket Classification: only classification matters."""
     if state.get("classification") == ground_truth.get("expected_classification"):
-        return 1.0
-    return 0.0
+        return 0.99
+    return 0.01
 
 
 def grade_task_easy_2(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
     """task_easy_2 – Priority Assignment: only priority matters."""
     if state.get("priority") == ground_truth.get("expected_priority"):
-        return 1.0
-    return 0.0
+        return 0.99
+    return 0.01
 
 
 def grade_task_medium_1(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
     """task_medium_1 – Classify and Respond: classification (0.5) + empathetic response (0.5)."""
-    score = 0.0
+    score = 0.01
     if state.get("classification") == ground_truth.get("expected_classification"):
-        score += 0.5
+        score += 0.49
     response = state.get("response", "")
     if response:
         empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
@@ -31,22 +31,22 @@ def grade_task_medium_1(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> 
         if ground_truth.get("sentiment") in [Sentiment.ANGRY, Sentiment.PANICKED, Sentiment.CONCERNED] and not has_empathy:
             pass  # No empathy for upset customer — no credit for response
         else:
-            score += 0.5
-    return score
+            score += 0.49
+    return min(score, 0.99)
 
 
 def grade_task_medium_2(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
     """task_medium_2 – Professional Resolution: classification (0.5) + professional response (0.5)."""
-    score = 0.0
+    score = 0.01
     if state.get("classification") == ground_truth.get("expected_classification"):
-        score += 0.5
+        score += 0.49
     response = state.get("response", "")
     if response:
         professional_keywords = ["help", "support", "assist", "resolve", "solution", "fix"]
         has_professional = any(w in response.lower() for w in professional_keywords)
         if has_professional:
-            score += 0.5
-    return score
+            score += 0.49
+    return min(score, 0.99)
 
 
 def grade_task_hard_1(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> float:
@@ -174,7 +174,7 @@ def score_episode(
     """
     try:
         if not history:
-            return 0.0
+            return 0.01
 
         # Resolve final state from history
         final_step = history[-1]
@@ -188,7 +188,7 @@ def score_episode(
         # Try per-task grader first
         if task_id and task_id in _GRADER_MAP:
             score = _GRADER_MAP[task_id](final_state, ground_truth)
-            return float(max(0.0, min(1.0, score)))
+            return float(max(0.01, min(0.99, score)))
 
         # Fallback: difficulty-based routing
         diff = (task_difficulty or "").upper()
@@ -208,4 +208,4 @@ def score_episode(
         return float(max(0.0, min(1.0, score)))
     except Exception as e:
         print(f"[GRADER CRASH] {task_id}: {str(e)}")
-        return 0.0
+        return 0.01

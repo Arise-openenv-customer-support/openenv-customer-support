@@ -213,7 +213,7 @@ def run_grader(
 
     try:
         score = env.grade(task_id, [{"state": mock_state}], ground_truth)
-        score = float(max(0.0, min(1.0, score)))
+        score = float(max(0.01, min(0.99, score)))
         return {
             "task_id": task_id,
             "score": score,

@@ -6,7 +6,29 @@ description: >
   priority, drafting empathetic responses, and resolving tickets.
   Implements the full OpenEnv step() / reset() / state() API.
 
-tasks: "backend/tasks.json"
+tasks:
+  - id: "task_easy_1"
+    name: "Ticket Classification"
+    difficulty: "EASY"
+    scenario: "A customer writes: 'I was charged twice for my subscription this month. Please refund one payment.' — The agent must identify this is a billing/refund issue."
+    objective: "Call classify_ticket with the correct category. Categories: refund | technical_issue | login_issue | general_inquiry | feedback | security. Score = 1.0 for correct, 0.0 for wrong."
+    passing_threshold: 0.5
+    grader: true
+  - id: "task_easy_2"
+    name: "Priority Triage"
+    difficulty: "EASY"
+    scenario: "A panicked user writes: 'I cannot log in and my team demo starts in 5 minutes!' — High urgency requires HIGH priority. A general question like 'How do I export a CSV?' should get LOW priority."
+    objective: "Call assign_priority with the correct urgency level (low | medium | high). Sentiment and time-pressure signals in the ticket determine priority. Score = 1.0 for correct, 0.0 otherwise."
+    passing_threshold: 0.5
+    grader: true
+  - id: "task_medium_1"
+    name: "Classify + Empathetic Reply"
+    difficulty: "MEDIUM"
+    scenario: "An angry customer is frustrated their refund has not arrived after 10 days. The agent must (1) correctly classify as 'refund' and (2) write a response that acknowledges their frustration using empathy words like 'sorry', 'apologize', or 'understand'."
+    objective: "Two actions in sequence: classify_ticket correctly (0.5 pts) + generate_response containing at least one empathy keyword for angry customers (0.5 pts). Missing empathy for an angry customer scores 0 on the response component."
+    passing_threshold: 0.5
+    grader: true
+
 
 environment:
   type: "custom"
