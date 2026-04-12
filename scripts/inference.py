@@ -6,13 +6,13 @@ from typing import List, Optional
 from openai import OpenAI
 
 from server.env import CustomerSupportEnv
-from server.models import Action
+from server.models import Action, SYSTEM_PROMPT, DEFAULT_MODEL, DEFAULT_API_BASE
 
 # Mandatory Environment Configuration
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_KEY = HF_TOKEN or os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "meta-llama/Meta-Llama-3-8B-Instruct"
+API_BASE_URL = os.getenv("API_BASE_URL") or DEFAULT_API_BASE
+MODEL_NAME = os.getenv("MODEL_NAME") or DEFAULT_MODEL
 
 # Benchmark Configuration
 TASK_NAME = os.getenv("TASK_NAME", "task_hard_1")
@@ -22,21 +22,6 @@ SUCCESS_SCORE_THRESHOLD = 0.1
 
 # Max Total Reward: Approx 1.0 per ticket * 3 tickets in queue
 MAX_TOTAL_REWARD = 3.0
-
-SYSTEM_PROMPT = textwrap.dedent(
-    """
-    You are an Enterprise AI Customer Support agent resolving a ticket pipeline.
-    For each ticket, you must:
-    1. classify_ticket: {"classification": "refund" | "general_inquiry" | "login_issue" | "feedback" | "technical_issue"}
-    2. assign_priority: {"priority": "low" | "medium" | "high"}
-    3. generate_response: {"response": "<empathetic_text>"}
-    4. resolve: {}
-
-    Your goal is to process the ticket efficiently and move to the next one in the queue.
-    You MUST return ONLY a fully valid JSON object:
-    {"action_type": "<name>", "payload": {...}}
-    """
-).strip()
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)

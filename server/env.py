@@ -1,7 +1,7 @@
 import random
 import time
 import copy
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Any
 from server.models import Action, Observation, Reward
 from server.tasks import TASKS
 
@@ -150,15 +150,15 @@ class CustomerSupportEnv:
     def grade_task(self, task_id: str, history: List[Dict[str, Any]], ground_truth: Dict[str, Any]) -> float:
         """Convenience method for the validator to grade a specific task execution."""
         from server.grader import score_episode
-        
+
         # Determine difficulty from task definition
         diff = "EASY"
         for t in TASKS:
             if t["id"] == task_id:
                 diff = t["difficulty"]
                 break
-                
-        return score_episode(diff, history, ground_truth)
+
+        return score_episode(diff, history, ground_truth, task_id=task_id)
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, dict]:
         """Standard OpenEnv API: Apply an action to the environment."""
