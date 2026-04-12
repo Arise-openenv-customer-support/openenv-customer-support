@@ -1,13 +1,20 @@
 # ============================================================
-# OpenEnv Customer Support — Production Dockerfile
+# OpenEnv Customer Support — Integrated Production Dockerfile
 # ============================================================
-# Evaluation Criteria:
-#   ✅ Runtime correctness   — clean build, no errors
-#   ✅ Interface compliance  — all OpenEnv standard endpoints
-#   ✅ Task design           — 7 graded tasks (EASY/MEDIUM/HARD)
-#   ✅ Grading logic         — deterministic scores in [0.0, 1.0]
+# Stage 1: Build the Frontend (Next.js)
 # ============================================================
+FROM node:18-slim AS builder
 
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+
+COPY frontend/ .
+RUN npm run build
+
+# ============================================================
+# Stage 2: Final Runtime (FastAPI)
+# ============================================================
 FROM python:3.10-slim
 
 # ── System dependencies ──────────────────────────────────────
@@ -34,14 +41,16 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # ── Application source ────────────────────────────────────────
 COPY --chown=user . $HOME/app/
 
-# ── Health check (validates runtime correctness) ─────────────
+# ── Copy built frontend from Stage 1 ─────────────────────────
+COPY --chown=user --from=builder /frontend/out $HOME/app/frontend/out
+
+# ── Health check ──────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
 EXPOSE ${PORT}
 
 # ── Start server ──────────────────────────────────────────────
-# Uses uvicorn for production-grade ASGI serving
 CMD ["python3", "-m", "uvicorn", "backend.main:app", \
      "--host", "0.0.0.0", \
      "--port", "7860", \

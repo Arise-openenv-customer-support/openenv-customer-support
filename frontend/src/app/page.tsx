@@ -12,13 +12,11 @@ export default function Home() {
   const [state, setState] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
-  const [bootAttempt, setBootAttempt] = useState(0);
   const [actionInput, setActionInput] = useState('{\n  "action_type": "classify_ticket",\n  "payload": { "classification": "refund" }\n}');
   const [logs, setLogs] = useState<any[]>([]);
-  const [score, setScore] = useState<number | null>(null);
-  const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
 
-  const showStatus = (text: string, type: 'success' | 'error') => {
+  const showStatus = (text: string, type: 'success' | 'error' | 'info') => {
     setStatusMsg({ text, type });
     setTimeout(() => setStatusMsg(null), 5000);
   };
@@ -47,54 +45,33 @@ export default function Home() {
 
   const resetEnv = async () => {
     setLoading(true);
-    setScore(null);
     try {
       const res = await fetch(`${API_URL}/reset`, { method: 'POST' });
       const data = await res.json();
       const obs = data.observation || data.state || data;
       setState(obs);
-      setLogs([{ role: 'system', message: 'Environment Reset Successfully' }]);
-      showStatus("Enterprise session initialized.", "success");
+      setLogs([{ role: 'system', message: 'Enterprise Session Re-initialized' }]);
+      showStatus("New ticket allocated.", "success");
       setBooting(false);
     } catch (e) {
-      showStatus("Connection failed. Ensure backend is running.", "error");
+      showStatus("Backend unreachable.", "error");
     }
     setLoading(false);
   };
 
   const boot = async () => {
-    setBootAttempt(prev => prev + 1);
     const success = await fetchState();
     if (success) {
-      addLog('Backend connected — session restored', 'system');
+      addLog('Connected to Environment Engine', 'system');
     } else {
-      try {
-        const res = await fetch(`${API_URL}/reset`, { method: 'POST' });
-        if (res.ok) {
-          const data = await res.json();
-          const obs = data.observation || data.state || data;
-          setState(obs);
-          setBooting(false);
-          addLog('Backend connected — session started', 'system');
-        } else {
-          setTimeout(boot, 2000);
-        }
-      } catch {
-        setTimeout(boot, 2000);
-      }
+      await resetEnv();
     }
   };
 
-  const sendAction = async () => {
+  const sendAction = async (overrideAction?: any) => {
     setLoading(true);
     try {
-      let actionObj;
-      try {
-        actionObj = JSON.parse(actionInput.trim());
-      } catch (e) {
-        throw new Error("Invalid JSON format.");
-      }
-
+      const actionObj = overrideAction || JSON.parse(actionInput.trim());
       const res = await fetch(`${API_URL}/step`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,37 +79,38 @@ export default function Home() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Step failed.");
+      if (!res.ok) throw new Error(data.detail || "Action rejected.");
 
       const obs = data.observation || data.state || data;
       setState(obs);
 
       if (obs?.status === "session_complete") {
-        addLog('🎉 Session Complete!', 'system');
-        showStatus("Session finished!", "success");
+        addLog('🏁 Queue processing complete', 'system');
+        showStatus("Session archived.", "info");
       } else {
         const reward = data.reward ?? 0;
-        const msg = data.info?.message || "Action processed";
-        addLog(`Action: ${actionObj.action_type}`, 'agent', `${msg} | Reward: ${reward.toFixed(3)}`, reward >= 0 ? "success" : "failed");
-        showStatus(`Action: ${reward >= 0 ? 'SUCCESS' : 'DEDUCTION'}`, reward >= 0 ? "success" : "error");
+        const msg = data.info?.message || "Processed";
+        addLog(`${actionObj.action_type}`, 'agent', `${msg} (Reward: ${reward.toFixed(2)})`, reward >= 0 ? "success" : "failed");
+        showStatus(reward >= 0 ? "Action Accepted" : "Reward Deduction", reward >= 0 ? "success" : "error");
       }
     } catch (e: any) {
-      showStatus(e.message || "Network Error.", "error");
+      showStatus(e.message || "Logic Error.", "error");
     }
     setLoading(false);
   };
 
-  const runHardGrader = async () => {
+  const predictAction = async () => {
     setLoading(true);
-    setScore(null);
+    showStatus("AI Model is thinking...", "info");
     try {
-      const res = await fetch(`${API_URL}/grader?task_id=task_hard_1`);
-      const data = await res.json();
-      setScore(data.score ?? 0);
-      addLog(`Evaluation Score: ${(data.score * 100).toFixed(0)}%`, 'system');
-      showStatus("Evaluation complete.", "success");
+      const res = await fetch(`${API_URL}/predict`);
+      if (!res.ok) throw new Error("Model rejected query.");
+      const suggestion = await res.json();
+      setActionInput(JSON.stringify(suggestion, null, 2));
+      addLog("AI model suggested next action", "system", suggestion.action_type);
+      showStatus("Action suggested!", "success");
     } catch (e: any) {
-      showStatus("Grader unavailable.", "error");
+      showStatus("Model offline or logic error.", "error");
     }
     setLoading(false);
   };
@@ -142,124 +120,270 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="container animate-slide">
-      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--card-border)', paddingBottom: '1.5rem' }}>
+    <main className="container">
+      <header className="main-header">
         <div>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--foreground)', margin: 0 }}>
-            OpenEnv <span style={{ color: 'var(--primary)' }}>Enterprise</span>
-          </h1>
-          <p style={{ color: 'var(--muted)', fontSize: '1.1rem', margin: '0.25rem 0 0 0' }}>AI Decision Monitoring System</p>
+          <h1>OpenEnv <span className="text-grad">Support Engine</span></h1>
+          <p className="subtitle">High-Fidelity Agentic Decision System</p>
         </div>
-        <div style={{ textAlign: 'right' }}>
-           <button className="btn btn-outline" onClick={resetEnv} disabled={loading || booting}>
-            {loading ? 'Processing...' : 'New Session'}
-          </button>
+        <div className="header-actions">
+           <button className="btn btn-secondary" onClick={resetEnv} disabled={loading || booting}>New Session</button>
         </div>
       </header>
 
       {statusMsg && (
-        <div style={{ 
-          position: 'fixed', top: '20px', right: '20px', zIndex: 1000, 
-          padding: '1rem 2rem', borderRadius: '12px', 
-          background: statusMsg.type === 'success' ? '#10b981' : '#ef4444', 
-          color: 'white', fontWeight: 700, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-          display: 'flex', alignItems: 'center', gap: '10px'
-        }}>
-          {statusMsg.type === 'success' ? '✅' : '❌'} {statusMsg.text}
+        <div className={`toast toast-${statusMsg.type}`}>
+          {statusMsg.type === 'success' ? '⚡' : statusMsg.type === 'error' ? '💥' : '🧠'} {statusMsg.text}
         </div>
       )}
 
-      <div className="layout-grid">
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div className="glass-card">
+      <div className="dashboard-grid">
+        {/* Left Column: State & Activity */}
+        <div className="dashboard-col">
+          <section className="card card-state">
             {booting ? (
-              <div style={{ textAlign: 'center', padding: '5rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1.5rem', animation: 'spin 2s linear infinite', display: 'inline-block' }}>⚙️</div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Starting Engine</h2>
-                <p style={{ color: 'var(--muted)' }}>Connecting to backend... Attempt {bootAttempt}</p>
+              <div className="loader-box">
+                <div className="spinner"></div>
+                <p>Initializing Environment...</p>
               </div>
-            ) : state && state?.status !== "session_complete" ? (
-              <div style={{ display: 'grid', gap: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Current Ticket</span>
-                    <p style={{ marginTop: '0.5rem', fontSize: '1.4rem', fontWeight: 600 }}>"{state?.ticket_text || 'Loading...'}"</p>
-                  </div>
-                  <div style={{ textAlign: 'right', minWidth: '100px' }}>
-                     <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--muted)' }}>SLA</div>
-                     <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{state?.steps_taken || 0} / {state?.sla_limit || 10}</div>
+            ) : state && state.status !== "session_complete" ? (
+              <div className="state-content">
+                <div className="state-header">
+                  <div className="ticket-badge">ACTIVE TICKET</div>
+                  <div className="sla-tracker">
+                    <span className="label">SLA Steps:</span>
+                    <span className="value">{state.steps_taken || 0} / {state.sla_limit || 10}</span>
                   </div>
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                  {['sentiment', 'priority', 'status'].map(key => (
-                    <div key={key} className="glass-card" style={{ padding: '0.75rem', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>{key}</div>
-                      <div className={`badge badge-${state?.[key] || 'neutral'}`} style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>{state?.[key] || 'OPEN'}</div>
-                    </div>
-                  ))}
-                  <div className="glass-card" style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Reward</div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 900, color: 'var(--primary)' }}>+{(state?.total_reward || 0).toFixed(2)}</div>
+                <h2 className="ticket-text">"{state.ticket_text}"</h2>
+
+                <div className="metrics-row">
+                  <div className="metric">
+                    <span className="label">Sentiment</span>
+                    <span className={`badge badge-${state.sentiment}`}>{state.sentiment?.toUpperCase()}</span>
+                  </div>
+                  <div className="metric">
+                    <span className="label">Priority</span>
+                    <span className={`badge badge-${state.priority || 'none'}`}>{state.priority?.toUpperCase() || 'UNSET'}</span>
+                  </div>
+                  <div className="metric">
+                    <span className="label">Reward</span>
+                    <span className="reward-value">{(state.total_reward || 0).toFixed(3)}</span>
                   </div>
                 </div>
               </div>
             ) : state?.status === "session_complete" ? (
-              <div style={{ textAlign: 'center', padding: '4rem' }}>
-                <div style={{ fontSize: '4rem' }}>🎉</div>
-                <h2 style={{ fontSize: '2rem', fontWeight: 800 }}>Queue Completed</h2>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', marginTop: '2rem' }}>
-                    <div><div style={{ color: 'var(--muted)', fontWeight: 700 }}>RESOLVED</div><div style={{ fontSize: '2rem', fontWeight: 900 }}>{state?.resolved || 0}</div></div>
-                    <div><div style={{ color: 'var(--muted)', fontWeight: 700 }}>TOTAL REWARD</div><div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)' }}>{(state?.total_reward || 0).toFixed(2)}</div></div>
+              <div className="complete-box">
+                <div className="confetti">🎯</div>
+                <h2>Queue Complete</h2>
+                <div className="final-stats">
+                  <div className="stat-unit"><span className="label">RESOLVED</span><span className="val">{state.resolved}</span></div>
+                  <div className="stat-unit"><span className="label">SCORE</span><span className="val text-grad">{(state.total_reward || 0).toFixed(2)}</span></div>
                 </div>
-                <button className="btn" style={{ marginTop: '2rem' }} onClick={resetEnv}>Start New Session</button>
+                <button className="btn btn-primary" onClick={resetEnv}>Next Queue</button>
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--muted)' }}>Initializing Enterprise Service...</div>
-            )}
-          </div>
+            ) : null}
+          </section>
 
-          <div className="glass-card">
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '1rem' }}>Control Center</h2>
-            <textarea 
-              value={actionInput} onChange={(e) => setActionInput(e.target.value)}
-              rows={5} style={{ fontSize: '0.9rem', fontFamily: 'monospace', marginBottom: '1.5rem' }}
-            />
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn" onClick={sendAction} disabled={loading || booting || !state} style={{ flex: 2 }}>
-                {loading ? 'Executing...' : 'Execute Action'}
-              </button>
-              <button className="btn btn-outline" onClick={runHardGrader} disabled={loading || booting || !state} style={{ flex: 1 }}>Grade</button>
-            </div>
-          </div>
-        </section>
+          {state?.kb_context && (
+            <section className="card card-kb glow-edge">
+              <div className="kb-header">📚 Knowledge Base Context</div>
+              <div className="kb-body">{state.kb_context}</div>
+            </section>
+          )}
 
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-           <div className="glass-card" style={{ flex: 1, maxHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Support Queue</h2>
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                 {state?.info?.queue?.map((q: string, i: number) => (
-                   <div key={i} style={{ padding: '0.75rem', borderBottom: '1px solid var(--card-border)', fontSize: '0.85rem', opacity: i === 0 ? 1 : 0.6 }}>
-                      #{i+1}: {q}
-                   </div>
-                 )) || <div style={{ color: 'var(--muted)' }}>Queue is empty</div>}
-              </div>
-           </div>
-
-           <div className="glass-card" style={{ height: '350px', display: 'flex', flexDirection: 'column' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Activity Logs</h2>
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse', gap: '0.5rem' }}>
+          <section className="card card-logs">
+            <h3 className="section-title">Workflow History</h3>
+            <div className="log-container">
               {logs.map((log, i) => (
-                <div key={i} className={`log-entry ${log.role === 'agent' ? 'log-agent' : 'log-customer'}`}>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 900, opacity: 0.5 }}>{log.role.toUpperCase()}</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{log.message}</div>
-                  {log.info && <div style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>{log.info}</div>}
+                <div key={i} className={`log-entry log-${log.role}`}>
+                  <div className="log-meta">{log.role.toUpperCase()}</div>
+                  <div className="log-msg">{log.message}</div>
+                  {log.info && <div className="log-info">{log.info}</div>}
                 </div>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
+
+        {/* Right Column: Decisions & Controls */}
+        <div className="dashboard-col">
+          <section className="card card-controls">
+            <div className="card-header">
+              <h3 className="section-title">Decision Center</h3>
+              <button className="btn-ai" onClick={predictAction} title="Ask AI Model Logic">🪄 AI Suggest</button>
+            </div>
+            
+            <div className="control-box">
+              <textarea 
+                className="code-editor"
+                value={actionInput} 
+                onChange={(e) => setActionInput(e.target.value)}
+                placeholder="Action JSON payload..."
+              />
+              <div className="action-buttons">
+                <button className="btn btn-primary btn-full" onClick={() => sendAction()} disabled={loading || !state}>Execute Step</button>
+              </div>
+            </div>
+
+            <div className="quick-templates">
+              <span className="label">Templates:</span>
+              <div className="chip-row">
+                <button className="chip" onClick={() => setActionInput('{\n  "action_type": "classify_ticket",\n  "payload": { "classification": "technical_issue" }\n}')}>Triage</button>
+                <button className="chip" onClick={() => setActionInput('{\n  "action_type": "search_kb",\n  "payload": { "query": "refund policy" }\n}')}>Search KB</button>
+                <button className="chip" onClick={() => setActionInput('{\n  "action_type": "resolve",\n  "payload": {} \n}')}>Resolve</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="card card-schema">
+             <h3 className="section-title">Environment Protocol</h3>
+             <ul className="info-list">
+               <li><strong>Step Limit:</strong> Sentiments decay over time.</li>
+               <li><strong>Context:</strong> Vague tickets require <code>ask_clarification</code>.</li>
+               <li><strong>Reward:</strong> Penalties for redundant or out-of-order actions.</li>
+             </ul>
+          </section>
+        </div>
       </div>
+
+      <style jsx global>{`
+        :root {
+          --bg: #030712;
+          --card: #0f172a;
+          --card-border: rgba(255,255,255,0.08);
+          --primary: #6366f1;
+          --secondary: #94a3b8;
+          --foreground: #f8fafc;
+          --muted: #64748b;
+          --success: #10b981;
+          --danger: #ef4444;
+          --warn: #f59e0b;
+        }
+
+        body {
+          background-color: var(--bg);
+          color: var(--foreground);
+          font-family: 'Inter', -apple-system, sans-serif;
+          margin: 0;
+          -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+          max-width: 1300px;
+          margin: 0 auto;
+          padding: 2rem;
+          min-height: 100vh;
+        }
+
+        .text-grad {
+          background: linear-gradient(to right, #818cf8, #c084fc);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .main-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 3rem;
+          padding-bottom: 2rem;
+          border-bottom: 1px solid var(--card-border);
+        }
+
+        h1 { font-size: 2.25rem; font-weight: 800; margin: 0; }
+        .subtitle { color: var(--muted); margin-top: 0.5rem; font-weight: 500; }
+
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: 1.4fr 1fr;
+          gap: 2rem;
+        }
+
+        .dashboard-col {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+
+        .card {
+          background: var(--card);
+          border: 1px solid var(--card-border);
+          border-radius: 1.5rem;
+          padding: 2rem;
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+
+        .card-state { border-left: 4px solid var(--primary); }
+        .glow-edge { border: 1px solid #c084fc; box-shadow: 0 0 20px rgba(192, 132, 252, 0.1); }
+
+        .ticket-badge { background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 800; }
+        .state-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .ticket-text { font-size: 1.75rem; font-weight: 700; line-height: 1.3; margin: 0; }
+
+        .metrics-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1.5rem;
+          margin-top: 2rem;
+        }
+
+        .metric .label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .reward-value { font-size: 1.5rem; font-weight: 900; color: var(--primary); }
+
+        .log-container { height: 300px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 0.75rem; padding-right: 0.5rem; }
+        .log-entry { padding: 1rem; border-radius: 1rem; border: 1px solid var(--card-border); position: relative; overflow: hidden; }
+        .log-agent { background: rgba(99, 102, 241, 0.05); }
+        .log-system { background: rgba(255, 255, 255, 0.03); color: var(--muted); border-style: dashed; }
+        
+        .log-meta { font-size: 0.6rem; font-weight: 800; margin-bottom: 0.25rem; opacity: 0.5; }
+        .log-msg { font-weight: 600; font-size: 0.9rem; }
+        .log-info { font-size: 0.75rem; color: var(--primary); margin-top: 0.25rem; }
+
+        .code-editor {
+          width: 100%;
+          background: #020617;
+          border: 1px solid var(--card-border);
+          border-radius: 1rem;
+          color: #94a3b8;
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          padding: 1rem;
+          resize: none;
+          margin-bottom: 1.5rem;
+          box-sizing: border-box;
+        }
+
+        .btn {
+          padding: 0.75rem 1.5rem;
+          border-radius: 1rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #4f46e5; transform: translateY(-2px); }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--card-border); }
+        .btn-ai { background: linear-gradient(to right, #818cf8, #c084fc); color: white; border: none; padding: 0.4rem 1rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; }
+
+        .chip-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .chip { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--muted); padding: 0.4rem 0.8rem; border-radius: 9999px; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
+        .chip:hover { border-color: var(--primary); color: var(--primary); }
+
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 0.5rem; font-weight: 800; font-size: 0.7rem; }
+        .badge-angry, .badge-high { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .badge-happy, .badge-low { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .badge-neutral { background: rgba(148, 163, 184, 0.1); color: var(--secondary); }
+
+        .toast { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 2rem; border-radius: 1rem; color: white; font-weight: 800; z-index: 1000; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); animation: slideUp 0.3s ease-out; }
+        .toast-success { background: var(--success); }
+        .toast-error { background: var(--danger); }
+        .toast-info { background: var(--primary); }
+
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      `}</style>
     </main>
   );
 }
