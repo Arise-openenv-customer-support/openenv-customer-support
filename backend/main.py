@@ -293,7 +293,7 @@ def run_baseline(session_id: str = "default"):
     if not env.queue:
         env.reset()
 
-    gt = env_instance.ground_truth
+    gt = env.ground_truth
 
     baseline_sequence = [
         {"action_type": "classify_ticket", "payload": {"classification": gt["expected_classification"]}},
@@ -305,7 +305,7 @@ def run_baseline(session_id: str = "default"):
     trace_results = []
     for step_logic in baseline_sequence:
         action = Action(**step_logic)
-        obs, reward, done, info = env_instance.step(action)
+        obs, reward, done, info = env.step(action)
         trace_results.append({
             "action": step_logic,
             "reward_earned": reward.value,

@@ -17,10 +17,10 @@ dependencies = [
 ]
 
 [project.scripts]
-server = "server.app:main"
+server = "backend.main:main"
 
 [tool.setuptools]
-packages = ["server"]
+packages = ["backend"]
 
 [tool.openenv]
-environment = "server.env:CustomerSupportEnv"
+environment = "backend.env:CustomerSupportEnv"
