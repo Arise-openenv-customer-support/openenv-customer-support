@@ -1,118 +1,105 @@
+from __future__ import annotations
 import random
 import copy
 from typing import Tuple, List, Dict, Any
-from server.models import Action, Observation, Reward
+from server.models import Action, Observation, Reward, TicketStatus, StepStatus, Sentiment, Priority, Classification
 from server.tasks import TASKS
 
 # ── Real-world customer support scenarios ─────────────────────────────────────
-# Each scenario covers a distinct category with strong classification signals
-# and realistic urgency cues so agents can learn correct behavior.
 SCENARIOS = [
-    # REFUND — angry, clear billing error
     {
         "ticket_text": "I was charged twice for my annual subscription this month. I have the bank statement to prove it. I want one payment refunded immediately.",
-        "sentiment": "angry",
-        "expected_classification": "refund",
-        "expected_priority": "high",
+        "sentiment": Sentiment.ANGRY,
+        "expected_classification": Classification.REFUND,
+        "expected_priority": Priority.HIGH,
         "sla_steps": 5,
         "context": "Duplicate billing charge. Customer has proof. High urgency.",
     },
-    # REFUND — neutral, post-cancellation billing
     {
         "ticket_text": "I cancelled my subscription 3 days ago but was still billed for next month. I need this refunded please.",
-        "sentiment": "neutral",
-        "expected_classification": "refund",
-        "expected_priority": "medium",
+        "sentiment": Sentiment.NEUTRAL,
+        "expected_classification": Classification.REFUND,
+        "expected_priority": Priority.MEDIUM,
         "sla_steps": 8,
         "context": "Post-cancellation charge. Polite customer, standard urgency.",
     },
-    # TECHNICAL ISSUE — angry, regression crash
     {
         "ticket_text": "The app crashes every single time I open a file larger than 50MB. This has been broken since last week's update — I cannot do my work.",
-        "sentiment": "angry",
-        "expected_classification": "technical_issue",
-        "expected_priority": "high",
+        "sentiment": Sentiment.ANGRY,
+        "expected_classification": Classification.TECHNICAL_ISSUE,
+        "expected_priority": Priority.HIGH,
         "sla_steps": 6,
         "context": "Regression bug blocking core workflow.",
     },
-    # TECHNICAL ISSUE — panicked, team outage
     {
         "ticket_text": "Our entire development team cannot access the API since this morning. We have a production deployment in 2 hours — this is a critical emergency!",
-        "sentiment": "panicked",
-        "expected_classification": "technical_issue",
-        "expected_priority": "high",
+        "sentiment": Sentiment.PANICKED,
+        "expected_classification": Classification.TECHNICAL_ISSUE,
+        "expected_priority": Priority.HIGH,
         "sla_steps": 3,
         "context": "P0 outage. Production deadline imminent.",
     },
-    # TECHNICAL ISSUE — neutral, minor UI bug
     {
         "ticket_text": "The dark mode setting doesn't save when I refresh the page. It reverts to light mode every time. Minor issue but a bit annoying.",
-        "sentiment": "neutral",
-        "expected_classification": "technical_issue",
-        "expected_priority": "low",
+        "sentiment": Sentiment.NEUTRAL,
+        "expected_classification": Classification.TECHNICAL_ISSUE,
+        "expected_priority": Priority.LOW,
         "sla_steps": 10,
         "context": "Minor UI preference bug. No business impact.",
     },
-    # LOGIN ISSUE — panicked, team locked out
     {
         "ticket_text": "I reset my password twice but I still cannot log in. My whole team is locked out and we have a client demo starting in 15 minutes!",
-        "sentiment": "panicked",
-        "expected_classification": "login_issue",
-        "expected_priority": "high",
+        "sentiment": Sentiment.PANICKED,
+        "expected_classification": Classification.LOGIN_ISSUE,
+        "expected_priority": Priority.HIGH,
         "sla_steps": 4,
         "context": "Password reset loop, team locked out. Time critical.",
     },
-    # LOGIN ISSUE — neutral, standard password reset
     {
         "ticket_text": "Hi, I forgot my password. Can you help me reset it or send me a recovery link? No rush, just let me know when you can.",
-        "sentiment": "neutral",
-        "expected_classification": "login_issue",
-        "expected_priority": "low",
+        "sentiment": Sentiment.NEUTRAL,
+        "expected_classification": Classification.LOGIN_ISSUE,
+        "expected_priority": Priority.LOW,
         "sla_steps": 12,
         "context": "Standard password recovery. No urgency.",
     },
-    # GENERAL INQUIRY — curious, pricing
     {
         "ticket_text": "Do you offer a non-profit discount? We are a registered charity and your standard price is a little high for our annual budget.",
-        "sentiment": "curious",
-        "expected_classification": "general_inquiry",
-        "expected_priority": "low",
+        "sentiment": Sentiment.CURIOUS,
+        "expected_classification": Classification.GENERAL_INQUIRY,
+        "expected_priority": Priority.LOW,
         "sla_steps": 10,
         "context": "Pricing question. Low urgency.",
     },
-    # GENERAL INQUIRY — neutral, how-to
     {
         "ticket_text": "How do I export all my project data to CSV? I need to share it with a client in a different format.",
-        "sentiment": "neutral",
-        "expected_classification": "general_inquiry",
-        "expected_priority": "low",
+        "sentiment": Sentiment.NEUTRAL,
+        "expected_classification": Classification.GENERAL_INQUIRY,
+        "expected_priority": Priority.LOW,
         "sla_steps": 10,
         "context": "Basic how-to question. No urgency.",
     },
-    # SECURITY — concerned, unauthorized login
     {
         "ticket_text": "I received an alert that someone logged into my account from a location I don't recognize. I did not authorize this. Is my account compromised?",
-        "sentiment": "concerned",
-        "expected_classification": "security",
-        "expected_priority": "high",
+        "sentiment": Sentiment.CONCERNED,
+        "expected_classification": Classification.SECURITY,
+        "expected_priority": Priority.HIGH,
         "sla_steps": 4,
         "context": "Potential account takeover. Must be high priority.",
     },
-    # SECURITY — concerned, encryption question
     {
         "ticket_text": "After reading about recent data breaches at other SaaS companies, I want to understand what encryption you use to protect my credit card details.",
-        "sentiment": "concerned",
-        "expected_classification": "security",
-        "expected_priority": "medium",
+        "sentiment": Sentiment.CONCERNED,
+        "expected_classification": Classification.SECURITY,
+        "expected_priority": Priority.MEDIUM,
         "sla_steps": 7,
         "context": "Security assurance question. No active breach.",
     },
-    # FEEDBACK — happy, positive
     {
         "ticket_text": "The new dashboard redesign is fantastic! Generating a report used to take me 10 minutes — now it's instant. Your team did an amazing job!",
-        "sentiment": "happy",
-        "expected_classification": "feedback",
-        "expected_priority": "low",
+        "sentiment": Sentiment.HAPPY,
+        "expected_classification": Classification.FEEDBACK,
+        "expected_priority": Priority.LOW,
         "sla_steps": 15,
         "context": "Positive feedback. No action needed urgently.",
     },
@@ -151,7 +138,7 @@ class CustomerSupportEnv:
         if not self.queue:
             return Observation(
                 state={
-                    "status": "session_complete",
+                    "status": TicketStatus.SESSION_COMPLETE,
                     "message": "All tickets in queue processed.",
                     "total_reward": self.total_reward,
                     "resolved": self.resolved_count,
@@ -166,7 +153,7 @@ class CustomerSupportEnv:
             "sentiment": ticket["sentiment"],
             "context": ticket.get("context", ""),
             "priority": ticket.get("priority"),
-            "status": ticket.get("status", "open"),
+            "status": ticket.get("status", TicketStatus.OPEN),
             "steps_taken": self.current_step,
             "classification": ticket.get("classification"),
             "response": ticket.get("response"),
@@ -175,7 +162,7 @@ class CustomerSupportEnv:
             "sla_warning": self.current_step >= ticket["sla_steps"] - 2,
             "total_reward": self.total_reward,
             "resolved": self.resolved_count,
-            "last_step_status": self.history[-1]["status"] if self.history else "neutral",
+            "last_step_status": self.history[-1]["status"] if self.history else StepStatus.NEUTRAL,
             "info": current_info,
         }
         return Observation(state=obs_state, info=current_info)
@@ -190,7 +177,6 @@ class CustomerSupportEnv:
         """Helper: expected values for the current ticket."""
         return self.queue[0] if self.queue else None
 
-    # Static tasks attribute for discovery
     tasks = TASKS
 
     def get_tasks(self) -> List[Dict]:
@@ -244,7 +230,7 @@ class CustomerSupportEnv:
             if pri == current_ticket["expected_priority"]:
                 reward_val += 0.25
                 message = f"✅ Priority set to '{pri}' correctly."
-            elif pri in ("high", "medium", "low"):
+            elif pri in (Priority.HIGH, Priority.MEDIUM, Priority.LOW):
                 reward_val -= 0.15
                 message = f"⚠️ Priority '{pri}' (expected: {current_ticket['expected_priority']})."
             else:
@@ -260,7 +246,7 @@ class CustomerSupportEnv:
             else:
                 reward_val += 0.2
                 # Empathy check for negative sentiment
-                if current_ticket["sentiment"] in ("angry", "panicked", "concerned"):
+                if current_ticket["sentiment"] in (Sentiment.ANGRY, Sentiment.PANICKED, Sentiment.CONCERNED):
                     empathy_words = ["sorry", "apologize", "understand", "concern", "frustrat"]
                     if not any(w in resp.lower() for w in empathy_words):
                         reward_val -= 0.1
@@ -277,7 +263,7 @@ class CustomerSupportEnv:
 
             if has_classify and has_priority and has_response:
                 reward_val += 0.4
-                current_ticket["status"] = "closed"
+                current_ticket["status"] = TicketStatus.CLOSED
                 self.resolved_count += 1
                 message = "✅ Ticket fully resolved!"
                 # SLA penalty
@@ -296,7 +282,7 @@ class CustomerSupportEnv:
                 is_terminal = True
 
         elif a_type == "escalate":
-            if current_ticket["sentiment"] in ("angry", "panicked"):
+            if current_ticket["sentiment"] in (Sentiment.ANGRY, Sentiment.PANICKED):
                 reward_val += 0.15
                 message = "✅ Escalated — appropriate for high-urgency customer."
             else:
@@ -322,7 +308,7 @@ class CustomerSupportEnv:
         reward_val -= 0.02
 
         self.total_reward += reward_val
-        status = "success" if reward_val > 0 else "failed" if reward_val < 0 else "neutral"
+        status = StepStatus.SUCCESS if reward_val > 0 else StepStatus.FAILED if reward_val < 0 else StepStatus.NEUTRAL
 
         self.history.append({
             "step_count": len(self.history) + 1,

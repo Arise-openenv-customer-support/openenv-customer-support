@@ -95,13 +95,14 @@ def get_schema():
             "properties": {
                 "ticket_text": {"type": "string"},
                 "sentiment": {"type": "string", "enum": ["angry", "neutral", "panicked", "curious", "happy", "concerned"]},
-                "priority": {"type": ["string", "null"], "enum": ["low", "medium", "high", None]},
+                "priority": {"type": ["string", "null"], "enum": ["low", "medium", "high", null]},
                 "status": {"type": "string", "enum": ["open", "closed", "session_complete"]},
                 "classification": {"type": ["string", "null"]},
                 "response": {"type": ["string", "null"]},
                 "queue_size": {"type": "integer"},
                 "resolved": {"type": "integer"},
-                "total_reward": {"type": "number"}
+                "total_reward": {"type": "number"},
+                "last_step_status": {"type": "string", "enum": ["success", "failed", "neutral"]}
             }
         }
     }

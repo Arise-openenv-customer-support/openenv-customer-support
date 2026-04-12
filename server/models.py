@@ -1,5 +1,37 @@
 from pydantic import BaseModel
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
+from enum import Enum
+
+class TicketStatus(str, Enum):
+    OPEN = "open"
+    CLOSED = "closed"
+    SESSION_COMPLETE = "session_complete"
+
+class StepStatus(str, Enum):
+    SUCCESS = "success"
+    FAILED = "failed"
+    NEUTRAL = "neutral"
+
+class Sentiment(str, Enum):
+    ANGRY = "angry"
+    NEUTRAL = "neutral"
+    PANICKED = "panicked"
+    CURIOUS = "curious"
+    HAPPY = "happy"
+    CONCERNED = "concerned"
+
+class Priority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+class Classification(str, Enum):
+    REFUND = "refund"
+    TECHNICAL_ISSUE = "technical_issue"
+    LOGIN_ISSUE = "login_issue"
+    GENERAL_INQUIRY = "general_inquiry"
+    FEEDBACK = "feedback"
+    SECURITY = "security"
 
 class Action(BaseModel):
     action_type: str

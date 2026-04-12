@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+from server.models import TicketStatus, Sentiment, Priority, Classification
 
 
 # ─── Per-task grader functions ───────────────────────────────────────────────
@@ -26,8 +27,9 @@ def grade_task_medium_1(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> 
     if response:
         empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
         has_empathy = any(w in response.lower() for w in empathy_keywords)
-        if state.get("sentiment") == "angry" and not has_empathy:
-            pass  # No empathy for angry customer — no credit
+        # Check if empathy was expected but missing
+        if ground_truth.get("sentiment") in [Sentiment.ANGRY, Sentiment.PANICKED, Sentiment.CONCERNED] and not has_empathy:
+            pass  # No empathy for upset customer — no credit for response
         else:
             score += 0.5
     return score
@@ -40,7 +42,7 @@ def grade_task_medium_2(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> 
         score += 0.5
     response = state.get("response", "")
     if response:
-        professional_keywords = ["help", "support", "assist", "resolve", "solution"]
+        professional_keywords = ["help", "support", "assist", "resolve", "solution", "fix"]
         has_professional = any(w in response.lower() for w in professional_keywords)
         if has_professional:
             score += 0.5
@@ -58,11 +60,11 @@ def grade_task_hard_1(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> fl
     if response:
         empathy_keywords = ["sorry", "apologize", "understand", "help", "concern"]
         has_empathy = any(w in response.lower() for w in empathy_keywords)
-        if state.get("sentiment") == "angry" and not has_empathy:
+        if ground_truth.get("sentiment") in [Sentiment.ANGRY, Sentiment.PANICKED] and not has_empathy:
             pass
         else:
             score += 0.25
-    if state.get("status") == "closed":
+    if state.get("status") == TicketStatus.CLOSED:
         score += 0.25
     return score
 
@@ -74,7 +76,7 @@ def grade_task_hard_2(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> fl
     if state.get("classification") == ground_truth.get("expected_classification"):
         score += 0.25
     # Priority must be high
-    if state.get("priority") == "high":
+    if state.get("priority") == Priority.HIGH:
         score += 0.25
     # Response must contain empathy
     response = state.get("response", "")
@@ -82,8 +84,8 @@ def grade_task_hard_2(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> fl
         empathy_keywords = ["sorry", "apologize", "understand", "help", "concern", "reassure"]
         if any(w in response.lower() for w in empathy_keywords):
             score += 0.25
-    # Sentiment must be angry (correct identification)
-    if state.get("sentiment") in ["angry", "panicked"]:
+    # Sentiment identification — validating the agent understands the urgency
+    if ground_truth.get("sentiment") in [Sentiment.ANGRY, Sentiment.PANICKED]:
         score += 0.25
     return score
 
@@ -98,7 +100,7 @@ def grade_task_hard_3(state: Dict[str, Any], ground_truth: Dict[str, Any]) -> fl
     response = state.get("response", "")
     if response and len(response.strip()) > 10:
         score += 0.2
-    if state.get("status") == "closed":
+    if state.get("status") == TicketStatus.CLOSED:
         score += 0.2
     # Efficiency bonus: fewer steps = better
     steps = state.get("steps_taken", 10)
@@ -152,7 +154,7 @@ def score_episode(
     # Fallback: difficulty-based routing
     diff = (task_difficulty or "").upper()
     if not diff or diff == "UNKNOWN":
-        tid = final_state.get("task_id", "").upper()
+        tid = (task_id or "").upper()
         if "HARD" in tid:
             diff = "HARD"
         elif "MEDIUM" in tid:

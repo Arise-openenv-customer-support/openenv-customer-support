@@ -16,106 +16,91 @@ tags:
 
 # 🎫 OpenEnv Customer Support Environment
 
-A complete, real-world **OpenEnv simulation environment** where an AI agent learns customer support decision-making through the standard `step()` / `reset()` / `state()` API.
+A complete, real-world **OpenEnv simulation environment** where an AI agent learns enterprise customer support decision-making through the standard `step()` / `reset()` / `state()` API.
 
 ---
 
-## Evaluation Criteria
+## Environment Concept
 
-| Criterion | Status | Details |
-|---|---|---|
-| ✅ **Runtime correctness** | Runs without errors | FastAPI + uvicorn, HEALTHCHECK in Dockerfile |
-| ✅ **Interface compliance** | Follows OpenEnv standard | `/reset`, `/step`, `/state`, `/health`, `/metadata`, `/schema`, `/tasks`, `/grader` |
-| ✅ **Task design** | Clear, realistic, testable | 7 graded tasks (EASY → HARD) with explicit scoring breakdowns |
-| ✅ **Grading logic** | Reward system makes sense | Deterministic per-task graders, scores strictly in [0.0, 1.0] |
+The environment simulates a professional support queue. An agent must process tickets by performing a specific lifecycle:
+1. **Classify** the issue correctly (e.g., Refund vs. Security).
+2. **Prioritize** based on sentiment and business impact.
+3. **Draft** an empathetic and professional response.
+4. **Resolve** or **Escalate** the ticket.
 
----
+### Action Space
 
-## OpenEnv Standard API
+| Action Type | Payload Description | Expected Values |
+|-------------|---------------------|-----------------|
+| `classify_ticket` | Categorize the ticket issue | `refund`, `technical_issue`, `login_issue`, `general_inquiry`, `feedback`, `security` |
+| `assign_priority` | Set business priority | `low`, `medium`, `high` |
+| `generate_response` | Draft a text response | String (e.g., "I apologize for the wait...") |
+| `resolve` | Close the ticket | `{}` (Requires classification, priority, and response to be set) |
+| `escalate` | Send to senior level | `{}` (Appropriate for high-sentiment/emergency tickets) |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET/POST | `/reset` | Start new episode, returns initial observation |
-| POST | `/step` | Submit action `{action_type, payload}`, returns `{observation, reward, done, info}` |
-| GET | `/state` | Current environment state |
-| GET | `/health` | Health check → `{status: "healthy"}` |
-| GET | `/metadata` | Environment name, description, version |
-| GET | `/schema` | JSON schemas for action / observation / state |
-| GET | `/tasks` | All 7 tasks with grader metadata |
-| GET | `/grader?task_id=<id>` | Grade specific task, returns score in [0.0, 1.0] |
-| POST | `/mcp` | JSON-RPC 2.0 MCP endpoint |
+### Observation Space
 
----
-
-## Actions
-
-```json
-{"action_type": "classify_ticket",   "payload": {"classification": "refund"}}
-{"action_type": "assign_priority",   "payload": {"priority": "high"}}
-{"action_type": "generate_response", "payload": {"response": "I apologize..."}}
-{"action_type": "resolve",           "payload": {}}
-{"action_type": "escalate",          "payload": {}}
-```
-
-**Categories:** `refund` · `technical_issue` · `login_issue` · `general_inquiry` · `feedback` · `security`  
-**Priorities:** `low` · `medium` · `high`
+| Key | Type | Description |
+|-----|------|-------------|
+| `ticket_text` | `string` | The raw customer inquiry |
+| `sentiment` | `string` | Customer mood (e.g., `angry`, `panicked`, `happy`) |
+| `status` | `string` | Ticket lifecycle state (`open`, `closed`, `session_complete`) |
+| `priority` | `string` | Currently assigned priority |
+| `classification`| `string` | Currently assigned category |
+| `steps_taken` | `int` | Number of actions taken on the current ticket |
+| `sla_limit` | `int` | Maximum steps allowed before penalty |
+| `total_reward` | `float` | Cumulative reward across the entire session |
+| `last_step_status`| `string` | Status of the previous action (`success`, `failed`, `neutral`) |
 
 ---
 
-## Tasks & Graders
+## Reward Function
 
-| ID | Name | Difficulty | Scoring |
-|----|------|-----------|---------|
-| `task_easy_1` | Ticket Classification | EASY | classification correct = 1.0 |
-| `task_easy_2` | Priority Assignment | EASY | priority correct = 1.0 |
-| `task_medium_1` | Classify and Respond | MEDIUM | classify 0.5 + empathy 0.5 |
-| `task_medium_2` | Professional Resolution | MEDIUM | classify 0.5 + keywords 0.5 |
-| `task_hard_1` | Full Support Workflow | HARD | 4 steps × 0.25 each |
-| `task_hard_2` | High-Priority Angry Customer | HARD | 4 components × 0.25 |
-| `task_hard_3` | Efficiency Challenge | HARD | accuracy + speed bonus |
+The environment provides dense, meaningful rewards to guide the agent:
 
----
-
-## Grading Logic
-
-Every grader returns a float in **[0.0, 1.0]**:
-
-- **EASY tasks** — binary: correct = 1.0, wrong = 0.0
-- **MEDIUM tasks** — partial credit: each sub-component = 0.5
-- **HARD tasks** — multi-component: each step = 0.2–0.25, clamped to 1.0
-
-```python
-# Example: grade task_hard_1
-score = env.grade("task_hard_1", history, ground_truth)
-assert 0.0 <= score <= 1.0  # ✅ always
-```
+- **Correct Classification**: `+0.35` (Wrong: `-0.20`)
+- **Correct Priority**: `+0.25` (Wrong: `-0.15`)
+- **Professional Response**: `+0.20`
+  - *Empathy Bonus*: Responses to upset customers must contain empathy keywords (e.g., "sorry", "understand").
+- **Resolution**: `+0.40`
+  - *SLA Penalty*: `-0.25` if resolved after the SLA step limit.
+- **Efficiency Cost**: `-0.02` per step to discourage redundant actions.
 
 ---
 
 ## Quick Start
 
+### Installation
+
 ```bash
-# Reset environment
-curl -X POST https://your-space.hf.space/reset
+pip install -r requirements.txt
+```
 
-# Execute action
-curl -X POST https://your-space.hf.space/step \
-  -H "Content-Type: application/json" \
-  -d '{"action_type": "classify_ticket", "payload": {"classification": "refund"}}'
+### Running the Environment
 
-# Grade a task
-curl https://your-space.hf.space/grader?task_id=task_hard_1
+```bash
+# Start the backend server
+uvicorn server.app:app --host 0.0.0.0 --port 7860
+```
+
+### Running a Baseline Inference
+
+To see the environment in action with a "perfect" baseline agent:
+```bash
+python scripts/baseline_run.py
 ```
 
 ---
 
-## Local Development
+## Evaluation
 
-```bash
-pip install -r requirements.txt
-uvicorn server.app:app --host 0.0.0.0 --port 7860 --reload
-# Visit http://localhost:7860
-```
+The environment includes 7 tasks with deterministic graders. Scores are strictly in the range `[0.0, 1.0]`.
+
+| Difficulty | Tasks | Scoring Logic |
+|------------|-------|---------------|
+| **EASY** | 2 | Binary: correct attribute = 1.0 |
+| **MEDIUM** | 2 | Partial: Classification (0.5) + Response Quality (0.5) |
+| **HARD** | 3 | Full Lifecycle: All 4 major actions must be correct and efficient |
 
 ---
 
