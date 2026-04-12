@@ -7,6 +7,8 @@ const API_URL = typeof window !== 'undefined' ? (window.location.origin.includes
 export default function Home() {
   const [state, setState] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const [bootAttempt, setBootAttempt] = useState(0);
   const [actionInput, setActionInput] = useState('{\n  "action_type": "classify_ticket",\n  "payload": { "classification": "refund" }\n}');
   const [logs, setLogs] = useState<any[]>([]);
   const [score, setScore] = useState<number | null>(null);
@@ -17,37 +19,66 @@ export default function Home() {
     setTimeout(() => setStatusMsg(null), 5000);
   };
 
+  const addLog = (message: string, role: string, info = '', status = '') => {
+    setLogs(prev => [...prev.slice(-19), { role, message, info, status }]);
+  };
+
   const fetchState = async () => {
     try {
       const res = await fetch(`${API_URL}/state`);
       if (res.ok) {
         const data = await res.json();
-        if (data.state && data.state.status !== "session_complete") {
-          setState(data.state);
-        } else {
-          resetEnv();
+        const obs = data.observation || data;
+        if (obs && obs.ticket_text) {
+          setState(obs);
+          setBooting(false);
+          return true;
         }
       }
     } catch (e) {
       console.error(e);
     }
+    return false;
   };
 
   const resetEnv = async () => {
     setLoading(true);
-    setLogs([]);
     setScore(null);
-    setStatusMsg(null);
     try {
-      const res = await fetch(`${API_URL}/reset`);
+      const res = await fetch(`${API_URL}/reset`, { method: 'POST' });
       const data = await res.json();
-      setState(data.state);
+      const obs = data.observation || data;
+      setState(obs);
       setLogs([{ role: 'system', message: 'Environment Reset Successfully' }]);
       showStatus("Enterprise session initialized.", "success");
+      setBooting(false);
     } catch (e) {
       showStatus("Connection failed. Ensure backend is running.", "error");
     }
     setLoading(false);
+  };
+
+  const boot = async () => {
+    setBootAttempt(prev => prev + 1);
+    const success = await fetchState();
+    if (success) {
+      addLog('Backend connected — session restored', 'system');
+    } else {
+      try {
+        const res = await fetch(`${API_URL}/reset`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          const obs = data.observation || data;
+          setState(obs);
+          setBooting(false);
+          addLog('Backend connected — session started', 'system');
+        } else {
+          setTimeout(boot, 1500);
+        }
+      } catch {
+        setTimeout(boot, 1500);
+      }
+    }
   };
 
   const sendAction = async () => {
@@ -72,21 +103,18 @@ export default function Home() {
       }
 
       const data = await res.json();
+      const obs = data.observation;
       
-      if (data.observation.state.status === "session_complete") {
-        setLogs(prev => [...prev, { role: 'system', message: '🎉 Session Complete!' }]);
-        setState(data.observation.state);
+      if (obs.status === "session_complete") {
+        addLog('🎉 Session Complete!', 'system');
+        setState(obs);
         showStatus("Session finished successfully!", "success");
       } else {
-        setState(data.observation.state);
-        const stepStatus = data.info.status;
-        setLogs(prev => [...prev, {
-          role: 'agent', 
-          message: `Action: ${actionObj.action_type}`,
-          info: `${data.info.message} | Reward: ${data.reward.value.toFixed(2)}`,
-          status: stepStatus
-        }]);
-        showStatus(`Action executed: ${stepStatus.toUpperCase()}`, stepStatus === "failed" ? "error" : "success");
+        setState(obs);
+        const reward = data.reward ?? 0;
+        const msg = data.info?.message || "Action processed";
+        addLog(`Action: ${actionObj.action_type}`, 'agent', `${msg} | Reward: ${reward.toFixed(3)}`, reward >= 0 ? "success" : "failed");
+        showStatus(`Action executed: ${reward >= 0 ? 'SUCCESS' : 'DEDUCTION'}`, reward >= 0 ? "success" : "error");
       }
     } catch (e: any) {
       showStatus(e.message || "Network Error.", "error");
@@ -102,7 +130,7 @@ export default function Home() {
       if (!res.ok) throw new Error("Evaluation engine unreachable.");
       const data = await res.json();
       setScore(data.score ?? 0);
-      setLogs(prev => [...prev, { role: 'system', message: `📈 Evaluation: ${(data.score * 100).toFixed(0)}%` }]);
+      addLog(`Evaluation: ${(data.score * 100).toFixed(0)}%`, 'system');
       showStatus("Model evaluation complete.", "success");
     } catch (e: any) {
       showStatus(e.message || "Grader connection failed.", "error");
@@ -111,7 +139,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchState();
+    boot();
   }, []);
 
   return (
@@ -154,17 +182,24 @@ export default function Home() {
         <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           <div className="glass-card">
-            {state && state.status !== "session_complete" ? (
+            {booting ? (
+              <div style={{ textAlign: 'center', padding: '5rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1.5rem', animation: 'spin 2s linear infinite', display: 'inline-block' }}>⚙️</div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Starting Engine</h2>
+                <p style={{ color: 'var(--muted)' }}>Connecting to backend... Attempt {bootAttempt}</p>
+                <div style={{ marginTop: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>Waiting for high-performance simulation environment</div>
+              </div>
+            ) : state && state.status !== "session_complete" ? (
               <div style={{ display: 'grid', gap: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                    <div style={{ flex: 1 }}>
                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Instruction</span>
                     <p style={{ marginTop: '0.5rem', fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.4 }}>"{state.ticket_text}"</p>
                   </div>
-                  <div style={{ marginLeft: '2rem', textAlign: 'right' }}>
+                  <div style={{ marginLeft: '2rem', textAlign: 'right', minWidth: '100px' }}>
                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: state.sla_warning ? 'var(--error)' : 'var(--muted)', textTransform: 'uppercase' }}>SLA Health</div>
                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: state.sla_warning ? 'var(--error)' : 'var(--foreground)' }}>
-                       {state.steps_taken} / {state.sla_limit}
+                       {state.steps_taken || 0} / {state.sla_limit || 10}
                      </div>
                   </div>
                 </div>
@@ -172,7 +207,7 @@ export default function Home() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                   <div className="glass-card" style={{ padding: '0.75rem' }}>
                     <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Sentiment</div>
-                    <div className={`badge badge-${state.sentiment}`} style={{ fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>{state.sentiment}</div>
+                    <div className={`badge badge-${state.sentiment}`} style={{ fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>{state.sentiment || 'neutral'}</div>
                   </div>
                   <div className="glass-card" style={{ padding: '0.75rem' }}>
                     <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Priority</div>
@@ -195,17 +230,18 @@ export default function Home() {
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', marginTop: '2rem' }}>
                    <div>
                      <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>RESOLVED</div>
-                     <div style={{ fontSize: '2rem', fontWeight: 900 }}>{state.info.resolved}</div>
+                     <div style={{ fontSize: '2rem', fontWeight: 900 }}>{state.resolved}</div>
                    </div>
                    <div>
-                     <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>TOTAL SCORE</div>
-                     <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)' }}>{state.info.total_reward.toFixed(2)}</div>
+                     <div style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>TOTAL REWARD</div>
+                     <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)' }}>{state.total_reward?.toFixed(2) || '0.00'}</div>
                    </div>
                 </div>
+                <button className="btn" style={{ marginTop: '2rem' }} onClick={resetEnv}>Start New Session</button>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--muted)' }}>
-                Waiting for backend synchronization...
+                Waiting for engine state...
               </div>
             )}
           </div>
@@ -231,10 +267,10 @@ export default function Home() {
               />
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn" onClick={sendAction} disabled={loading || !state || state.status === 'session_complete'} style={{ flex: 2 }}>
+              <button className="btn" onClick={sendAction} disabled={loading || booting || !state || state.status === 'session_complete'} style={{ flex: 2 }}>
                 {loading ? 'Executing...' : 'Execute Action'}
               </button>
-              <button className="btn btn-outline" onClick={runHardGrader} disabled={loading || !state} style={{ flex: 1 }}>
+              <button className="btn btn-outline" onClick={runHardGrader} disabled={loading || booting || !state} style={{ flex: 1 }}>
                 Grade Model
               </button>
             </div>
