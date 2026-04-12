@@ -675,20 +675,71 @@
   }
 
   // ─── Init ─────────────────────────────────────────────────────────────────────
-  async function init() {
-    await fetchState();
-    await loadTasks();
-    if (!currentState) {
-      await resetEnv();
+  // ─── Boot sequence: retry every 1.5s until backend ready ──────────────────
+  let _bootAttempts = 0;
+  const MAX_ATTEMPTS = 40;
+
+  function showBooting(n) {
+    const dots = '.'.repeat((n % 4) + 1);
+    const body = document.getElementById('ticket-body');
+    if (body) body.innerHTML = `
+      <div class="empty">
+        <div style="font-size:2.5rem;margin-bottom:1rem;animation:spin 1.5s linear infinite;display:inline-block;">⚙️</div>
+        <h2 style="margin-bottom:.5rem;">Starting Environment</h2>
+        <p style="color:var(--muted);font-size:.85rem;">Connecting to backend${dots}</p>
+        <div style="margin-top:1.5rem;background:var(--surface2);border-radius:10px;padding:.75rem 1.5rem;display:inline-block;">
+          <span style="font-size:.75rem;color:var(--muted);">Attempt ${n} / ${MAX_ATTEMPTS} — please wait for cold start...</span>
+        </div>
+      </div>`;
+    document.getElementById('dot').style.background = 'var(--warning)';
+    document.getElementById('status-text').textContent = 'Connecting' + dots;
+  }
+
+  async function boot() {
+    _bootAttempts++;
+    showBooting(_bootAttempts);
+
+    if (_bootAttempts > MAX_ATTEMPTS) {
+      document.getElementById('ticket-body').innerHTML = `
+        <div class="empty">
+          <div class="icon">❌</div>
+          <h2>Backend Unreachable</h2>
+          <p style="margin-bottom:1rem;">Could not connect after 60s.</p>
+          <button class="btn btn-primary" onclick="restartBoot()">🔄 Retry</button>
+        </div>`;
+      setConnected(false);
+      return;
+    }
+
+    try {
+      const h = await fetch(API + '/health', { signal: AbortSignal.timeout(3000) });
+      if (!h.ok) throw new Error('not ready');
+
+      // Backend ready — load reset + tasks in parallel
+      setConnected(true);
+      const [resetData, tasksData] = await Promise.all([
+        fetchJSON('/reset'),
+        fetchJSON('/tasks').catch(() => [])
+      ]);
+
+      const obs = resetData.observation || resetData;
+      currentState = obs;
+      renderTicket(obs);
+      renderQueue(obs);
+      if (tasksData.length) renderTasks(tasksData);
+
+      clearLogs();
+      addLog('Backend connected — session auto-started', 'system');
+      showToast('Environment ready! 🚀', 'success');
+
+    } catch {
+      setTimeout(boot, 1500); // retry
     }
   }
 
-  init();
+  function restartBoot() { _bootAttempts = 0; boot(); }
 
-  // keyboard shortcut: Ctrl+Enter to execute action
-  document.getElementById('action-input').addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendAction();
-  });
-</script>
+  boot(); // kick off immediately
+
 </body>
 </html>
