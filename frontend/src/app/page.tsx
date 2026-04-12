@@ -99,22 +99,6 @@ export default function Home() {
     setLoading(false);
   };
 
-  const predictAction = async () => {
-    setLoading(true);
-    showStatus("AI Model is thinking...", "info");
-    try {
-      const res = await fetch(`${API_URL}/predict`);
-      if (!res.ok) throw new Error("Model rejected query.");
-      const suggestion = await res.json();
-      setActionInput(JSON.stringify(suggestion, null, 2));
-      addLog("AI model suggested next action", "system", suggestion.action_type);
-      showStatus("Action suggested!", "success");
-    } catch (e: any) {
-      showStatus("Model offline or logic error.", "error");
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
     boot();
   }, []);
@@ -212,7 +196,6 @@ export default function Home() {
           <section className="card card-controls">
             <div className="card-header">
               <h3 className="section-title">Decision Center</h3>
-              <button className="btn-ai" onClick={predictAction} title="Ask AI Model Logic">🪄 AI Suggest</button>
             </div>
             
             <div className="control-box">
