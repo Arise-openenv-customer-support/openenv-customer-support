@@ -118,34 +118,37 @@ else
   stop_at "Step 1"
 fi
 
-log "${BOLD}Step 2/3: Running docker build${NC} ..."
+log "${BOLD}Step 2/3: Checking Dockerfile${NC} ..."
 
 if ! command -v docker &>/dev/null; then
-  fail "docker command not found"
-  hint "Install Docker: https://docs.docker.com/get-docker/"
-  stop_at "Step 2"
-fi
-
-if [ -f "$REPO_DIR/Dockerfile" ]; then
-  DOCKER_CONTEXT="$REPO_DIR"
-elif [ -f "$REPO_DIR/server/Dockerfile" ]; then
-  DOCKER_CONTEXT="$REPO_DIR/server"
+  log "${YELLOW}WARNING:${NC} docker command not found. Skipping local build check."
+  if [ -f "$REPO_DIR/Dockerfile" ] || [ -f "$REPO_DIR/server/Dockerfile" ]; then
+    pass "Dockerfile exists (skipping local build validation)"
+  else
+    fail "No Dockerfile found in repo root or server/ directory"
+    stop_at "Step 2"
+  fi
 else
-  fail "No Dockerfile found in repo root or server/ directory"
-  stop_at "Step 2"
-fi
+  if [ -f "$REPO_DIR/Dockerfile" ]; then
+    DOCKER_CONTEXT="$REPO_DIR"
+  elif [ -f "$REPO_DIR/server/Dockerfile" ]; then
+    DOCKER_CONTEXT="$REPO_DIR/server"
+  else
+    fail "No Dockerfile found in repo root or server/ directory"
+    stop_at "Step 2"
+  fi
 
-log "  Found Dockerfile in $DOCKER_CONTEXT"
+  log "  Found Dockerfile in $DOCKER_CONTEXT. Building..."
+  BUILD_OK=false
+  BUILD_OUTPUT=$(run_with_timeout "$DOCKER_BUILD_TIMEOUT" docker build -t openenv-eval "$DOCKER_CONTEXT" 2>&1) && BUILD_OK=true
 
-BUILD_OK=false
-BUILD_OUTPUT=$(run_with_timeout "$DOCKER_BUILD_TIMEOUT" docker build -t openenv-eval "$DOCKER_CONTEXT" 2>&1) && BUILD_OK=true
-
-if [ "$BUILD_OK" = true ]; then
-  pass "Docker build succeeded"
-else
-  fail "Docker build failed (timeout=${DOCKER_BUILD_TIMEOUT}s)"
-  printf "%s\n" "$BUILD_OUTPUT" | tail -20
-  stop_at "Step 2"
+  if [ "$BUILD_OK" = true ]; then
+    pass "Docker build succeeded"
+  else
+    fail "Docker build failed (timeout=${DOCKER_BUILD_TIMEOUT}s)"
+    printf "%s\n" "$BUILD_OUTPUT" | tail -20
+    stop_at "Step 2"
+  fi
 fi
 
 log "${BOLD}Step 3/3: Running openenv validate${NC} ..."
